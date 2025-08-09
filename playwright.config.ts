@@ -107,9 +107,6 @@ export default defineConfig({
   /* Output directory for test results */
   outputDir: 'test-results/',
 
-  /* Directory for test artifacts */
-  testDir: './e2e',
-  
   /* Maximum number of failures */
   maxFailures: process.env.CI ? 5 : undefined,
 })

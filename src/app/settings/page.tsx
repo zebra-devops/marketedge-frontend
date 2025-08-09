@@ -26,10 +26,14 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string
+    industry: string
+    subscription_plan: 'basic' | 'professional' | 'enterprise'
+  }>({
     name: '',
     industry: '',
-    subscription_plan: 'basic' as const
+    subscription_plan: 'basic'
   })
   const [profileForm, setProfileForm] = useState<UserProfileForm>({
     first_name: '',

@@ -38,10 +38,14 @@ export interface MockUser {
   id: string
   email: string
   name: string
-  role: 'admin' | 'manager' | 'user' | 'viewer'
+  first_name: string
+  last_name: string
+  role: 'admin' | 'analyst' | 'viewer'
   organizationId: string
+  organisation_id: string
   permissions: string[]
   isActive: boolean
+  is_active: boolean
   organisation: MockOrganization
 }
 
@@ -94,10 +98,14 @@ export const DEFAULT_USER: MockUser = {
   id: 'test-user-456',
   email: 'test@example.com',
   name: 'Test User',
-  role: 'user',
+  first_name: 'Test',
+  last_name: 'User',
+  role: 'analyst',
   organizationId: 'test-org-123',
+  organisation_id: 'test-org-123',
   permissions: ['read:data', 'write:data'],
   isActive: true,
+  is_active: true,
   organisation: DEFAULT_ORGANIZATION,
 }
 
@@ -154,12 +162,12 @@ const TestProviders: React.FC<TestProvidersProps> = ({
     },
   })
 
-  let wrappedChildren = React.createElement(React.Fragment, {}, children)
+  let wrappedChildren: React.ReactElement = React.createElement(React.Fragment, {}, children)
 
   // Wrap with Query Provider if enabled
   if (enableQuery) {
     wrappedChildren = React.createElement(
-      QueryClientProvider,
+      QueryClientProvider as any,
       { client: queryClient },
       wrappedChildren
     )
@@ -185,7 +193,7 @@ const TestProviders: React.FC<TestProvidersProps> = ({
 
   // Always wrap with Toast Provider for notifications
   wrappedChildren = React.createElement(
-    ToastProvider,
+    ToastProvider as any,
     {},
     wrappedChildren
   )
@@ -216,13 +224,13 @@ export const renderWithProviders = (
     React.createElement(
       TestProviders,
       {
+        children,
         tenant: mergedTenant,
         user: mergedUser,
         enableAuth,
         enableQuery,
         queryClient,
-      },
-      children
+      }
     )
 
   return render(ui, { wrapper: AllTheProviders, ...renderOptions })
@@ -557,8 +565,8 @@ export const resetTestEnvironment = () => {
   })
   
   // Clear any global state
-  if (window.__PLATFORM_CONFIG__) {
-    delete window.__PLATFORM_CONFIG__
+  if ((window as any).__PLATFORM_CONFIG__) {
+    delete (window as any).__PLATFORM_CONFIG__
   }
 }
 

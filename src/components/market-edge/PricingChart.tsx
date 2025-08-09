@@ -32,8 +32,8 @@ export const PricingChart: React.FC<PricingChartProps> = ({
   showLegend = true,
   className = ''
 }) => {
-  const { chartData, competitorColors } = useMemo(() => {
-    if (!data) return { chartData: [], competitorColors: {} };
+  const { chartData, competitorColors } = useMemo((): { chartData: any[]; competitorColors: Record<string, string> } => {
+    if (!data) return { chartData: [], competitorColors: {} as Record<string, string> };
 
     // Handle MarketTrends data
     if ('market_trend' in data && data.market_trend) {
@@ -55,9 +55,10 @@ export const PricingChart: React.FC<PricingChartProps> = ({
         // Add competitor data
         if (data.competitor_trends) {
           Object.entries(data.competitor_trends).forEach(([competitorId, competitorData]) => {
-            const weeklyData = competitorData.weekly_averages[week];
+            const typedCompetitorData = competitorData as { name: string; weekly_averages: Record<string, number>; };
+            const weeklyData = typedCompetitorData.weekly_averages[week];
             if (weeklyData) {
-              dataPoint[competitorData.name] = Math.round(weeklyData * 100) / 100;
+              dataPoint[typedCompetitorData.name] = Math.round(weeklyData * 100) / 100;
             }
           });
         }
@@ -70,24 +71,34 @@ export const PricingChart: React.FC<PricingChartProps> = ({
 
     // Handle CompetitorComparison data
     if ('competitors' in data) {
-      const chartData = Object.entries(data.competitors).map(([id, competitor]) => ({
-        name: competitor.name.length > 15 ? competitor.name.substring(0, 15) + '...' : competitor.name,
-        fullName: competitor.name,
-        averagePrice: Math.round(competitor.average_price * 100) / 100,
-        minPrice: competitor.min_price,
-        maxPrice: competitor.max_price,
-        marketShare: competitor.market_share_estimate || 0,
-        dataPoints: competitor.data_points
-      }));
+      const chartData = Object.entries(data.competitors).map(([id, competitor]) => {
+        const typedCompetitor = competitor as {
+          name: string;
+          average_price: number;
+          min_price: number;
+          max_price: number;
+          market_share_estimate?: number;
+          data_points: number;
+        };
+        return {
+          name: typedCompetitor.name.length > 15 ? typedCompetitor.name.substring(0, 15) + '...' : typedCompetitor.name,
+          fullName: typedCompetitor.name,
+          averagePrice: Math.round(typedCompetitor.average_price * 100) / 100,
+          minPrice: typedCompetitor.min_price,
+          maxPrice: typedCompetitor.max_price,
+          marketShare: typedCompetitor.market_share_estimate || 0,
+          dataPoints: typedCompetitor.data_points
+        };
+      });
 
       return { 
         chartData: chartData.sort((a, b) => a.averagePrice - b.averagePrice),
-        competitorColors: {}
+        competitorColors: {} as Record<string, string>
       };
     }
 
     // Handle generic data
-    return { chartData: data, competitorColors: {} };
+    return { chartData: data, competitorColors: {} as Record<string, string> };
   }, [data]);
 
   const formatCurrency = (value: number) => {
@@ -151,56 +162,102 @@ export const PricingChart: React.FC<PricingChartProps> = ({
   const renderChart = () => {
     // For trends data (line/area chart)
     if ('market_trend' in data) {
-      const Chart = chartType === 'area' ? AreaChart : LineChart;
-      const Element = chartType === 'area' ? Area : Line;
-
-      return (
-        <ResponsiveContainer width="100%" height={height}>
-          <Chart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis 
-              dataKey="week" 
-              tick={{ fontSize: 12 }}
-              stroke="#6b7280"
-            />
-            <YAxis 
-              tick={{ fontSize: 12 }}
-              tickFormatter={formatCurrency}
-              stroke="#6b7280"
-            />
-            <Tooltip content={<CustomTooltip />} />
-            {showLegend && <Legend />}
-            
-            {/* Market trend line */}
-            <Element
-              type="monotone"
-              dataKey="market"
-              stroke="#1f2937"
-              strokeWidth={3}
-              strokeDasharray="5 5"
-              name="Market Average"
-              {...(chartType === 'area' && { fill: '#1f293740' })}
-            />
-            
-            {/* Competitor lines */}
-            {data.competitor_trends && Object.entries(data.competitor_trends).map(([competitorId, competitorData]) => (
-              <Element
-                key={competitorId}
-                type="monotone"
-                dataKey={competitorData.name}
-                stroke={competitorColors[competitorId] || '#6b7280'}
-                strokeWidth={2}
-                name={competitorData.name}
-                connectNulls={false}
-                {...(chartType === 'area' && { 
-                  fill: `${competitorColors[competitorId] || '#6b7280'}20`,
-                  fillOpacity: 0.3
-                })}
+      if (chartType === 'area') {
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <AreaChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis 
+                dataKey="week" 
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
               />
-            ))}
-          </Chart>
-        </ResponsiveContainer>
-      );
+              <YAxis 
+                tick={{ fontSize: 12 }}
+                tickFormatter={formatCurrency}
+                stroke="#6b7280"
+              />
+              <Tooltip content={<CustomTooltip />} />
+              {showLegend && <Legend />}
+              
+              {/* Market trend area */}
+              <Area
+                type="monotone"
+                dataKey="market"
+                stroke="#1f2937"
+                strokeWidth={3}
+                strokeDasharray="5 5"
+                name="Market Average"
+                fill="#1f293740"
+              />
+              
+              {/* Competitor areas */}
+              {data.competitor_trends && Object.entries(data.competitor_trends).map(([competitorId, competitorData]) => {
+                const typedCompetitorData = competitorData as { name: string; weekly_averages: Record<string, number>; };
+                return (
+                  <Area
+                    key={competitorId}
+                    type="monotone"
+                    dataKey={typedCompetitorData.name}
+                    stroke={competitorColors[competitorId] || '#6b7280'}
+                    strokeWidth={2}
+                    name={typedCompetitorData.name}
+                    connectNulls={false}
+                    fill={`${competitorColors[competitorId] || '#6b7280'}20`}
+                    fillOpacity={0.3}
+                  />
+                );
+              })}
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+      } else {
+        return (
+          <ResponsiveContainer width="100%" height={height}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis 
+                dataKey="week" 
+                tick={{ fontSize: 12 }}
+                stroke="#6b7280"
+              />
+              <YAxis 
+                tick={{ fontSize: 12 }}
+                tickFormatter={formatCurrency}
+                stroke="#6b7280"
+              />
+              <Tooltip content={<CustomTooltip />} />
+              {showLegend && <Legend />}
+              
+              {/* Market trend line */}
+              <Line
+                type="monotone"
+                dataKey="market"
+                stroke="#1f2937"
+                strokeWidth={3}
+                strokeDasharray="5 5"
+                name="Market Average"
+              />
+              
+              {/* Competitor lines */}
+              {data.competitor_trends && Object.entries(data.competitor_trends).map(([competitorId, competitorData]) => {
+                const typedCompetitorData = competitorData as { name: string; weekly_averages: Record<string, number>; };
+                return (
+                  <Line
+                    key={competitorId}
+                    type="monotone"
+                    dataKey={typedCompetitorData.name}
+                    stroke={competitorColors[competitorId] || '#6b7280'}
+                    strokeWidth={2}
+                    name={typedCompetitorData.name}
+                    connectNulls={false}
+                  />
+                );
+              })}
+            </LineChart>
+          </ResponsiveContainer>
+        );
+      }
     }
 
     // For competitor comparison (bar chart)

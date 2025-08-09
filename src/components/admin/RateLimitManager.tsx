@@ -51,8 +51,13 @@ export const RateLimitManager: React.FC<RateLimitManagerProps> = ({
   const [editingMode, setEditingMode] = useState<'edit' | 'emergency' | null>(null)
 
   // Form state
-  const [formData, setFormData] = useState({
-    tier: 'standard' as const,
+  const [formData, setFormData] = useState<{
+    tier: 'standard' | 'premium' | 'enterprise'
+    requests_per_hour: number
+    burst_size: number
+    emergency_reason: string
+  }>({
+    tier: 'standard',
     requests_per_hour: 1000,
     burst_size: 100,
     emergency_reason: ''

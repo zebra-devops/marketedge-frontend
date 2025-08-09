@@ -14,7 +14,7 @@ import React, { ReactElement, ReactNode } from 'react'
 import { render, RenderOptions, RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from 'react-query'
-import { ToastContainer } from 'react-hot-toast'
+import { Toaster } from 'react-hot-toast'
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../jest.setup'
@@ -251,7 +251,7 @@ const createTestWrapper = (options: MultiTenantRenderOptions = {}) => {
       wrappedChildren = (
         <>
           {wrappedChildren}
-          <ToastContainer />
+          <Toaster />
         </>
       )
     }

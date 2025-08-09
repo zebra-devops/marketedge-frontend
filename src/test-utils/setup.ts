@@ -50,8 +50,8 @@ afterEach(() => {
   sessionStorage.clear()
   
   // Reset any global state
-  if (window.__PLATFORM_CONFIG__) {
-    delete window.__PLATFORM_CONFIG__
+  if ((window as any).__PLATFORM_CONFIG__) {
+    delete (window as any).__PLATFORM_CONFIG__
   }
 })
 
@@ -63,7 +63,7 @@ afterAll(() => {
 // Global test environment setup
 beforeEach(() => {
   // Set up default platform configuration for tests
-  window.__PLATFORM_CONFIG__ = {
+  (window as any).__PLATFORM_CONFIG__ = {
     environment: 'test',
     apiUrl: 'http://localhost:8000',
     enableDebugMode: true,

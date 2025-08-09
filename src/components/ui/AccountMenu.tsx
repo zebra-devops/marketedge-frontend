@@ -61,7 +61,7 @@ export const AccountMenu: React.FC<AccountMenuProps> = ({ className = '' }) => {
             {/* User Info Header */}
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-sm font-medium text-gray-900">{user.email}</p>
-              <p className="text-xs text-gray-500 capitalize">{user.role} • {user.organisation?.name || 'No Organisation'}</p>
+              <p className="text-xs text-gray-500 capitalize">{user.role} • {user.organisation_id || 'No Organisation'}</p>
             </div>
 
             {/* Settings */}
