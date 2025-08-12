@@ -9,7 +9,8 @@ import {
   UsersIcon,
   ExclamationTriangleIcon,
   ChartBarIcon,
-  ClockIcon
+  ClockIcon,
+  BuildingOffice2Icon
 } from '@heroicons/react/24/outline';
 import { useAuthContext } from '@/hooks/useAuth';
 import { FeatureFlagManager } from '@/components/admin/FeatureFlagManager';
@@ -17,8 +18,9 @@ import { ModuleManager } from '@/components/admin/ModuleManager';
 import { AuditLogViewer } from '@/components/admin/AuditLogViewer';
 import { AdminStats } from '@/components/admin/AdminStats';
 import { SecurityEvents } from '@/components/admin/SecurityEvents';
+import { OrganisationManager } from '@/components/admin/OrganisationManager';
 
-type TabType = 'dashboard' | 'feature-flags' | 'modules' | 'audit-logs' | 'security';
+type TabType = 'dashboard' | 'organisations' | 'feature-flags' | 'modules' | 'audit-logs' | 'security';
 
 export default function AdminPage() {
   const { user } = useAuthContext();
@@ -51,6 +53,12 @@ export default function AdminPage() {
       name: 'Dashboard', 
       icon: ChartBarIcon,
       description: 'Overview and statistics'
+    },
+    { 
+      id: 'organisations', 
+      name: 'Organisations', 
+      icon: BuildingOffice2Icon,
+      description: 'Create and manage organisations'
     },
     { 
       id: 'feature-flags', 
@@ -137,6 +145,7 @@ export default function AdminPage() {
           {/* Main Content */}
           <div className="flex-1 min-w-0">
             {activeTab === 'dashboard' && <AdminStats />}
+            {activeTab === 'organisations' && <OrganisationManager />}
             {activeTab === 'feature-flags' && <FeatureFlagManager />}
             {activeTab === 'modules' && <ModuleManager />}
             {activeTab === 'audit-logs' && <AuditLogViewer />}

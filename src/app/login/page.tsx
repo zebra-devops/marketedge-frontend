@@ -60,8 +60,8 @@ export default function LoginPage() {
     setIsProcessingCallback(true)
     try {
       console.log('Processing auth code:', code.substring(0, 10) + '...')
-      const redirectUri = `${window.location.origin}/login`
-      await login(code, redirectUri)
+      const redirectUri = `${window.location.origin}/callback`
+      await login({ code, redirect_uri: redirectUri })
       toast.success('Login successful!')
       router.push('/dashboard')
     } catch (error) {
@@ -82,9 +82,18 @@ export default function LoginPage() {
     isProcessingRef.current = false
     
     try {
-      const redirectUri = `${window.location.origin}/login`
-      const { auth_url } = await authService.getAuth0Url(redirectUri)
-      console.log('Redirecting to Auth0:', auth_url)
+      const redirectUri = `${window.location.origin}/callback`
+      
+      // Check for organization hint in URL parameters
+      const orgHint = searchParams.get('org') || undefined
+      
+      const { auth_url } = await authService.getAuth0Url(
+        redirectUri,
+        undefined, // no additional scopes for now
+        orgHint // organization hint for multi-tenant routing
+      )
+      
+      console.log('Redirecting to Auth0 with tenant context:', { auth_url, orgHint })
       window.location.href = auth_url
     } catch (error) {
       console.error('Failed to get Auth0 URL:', error)

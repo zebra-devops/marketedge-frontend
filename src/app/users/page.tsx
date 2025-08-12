@@ -2,28 +2,34 @@
 
 import { useState, useEffect } from 'react'
 import { useAuthContext } from '@/hooks/useAuth'
+import { useOrganisationContext } from '@/components/providers/OrganisationProvider'
 import { apiService } from '@/services/api'
 import Button from '@/components/ui/Button'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Modal from '@/components/ui/Modal'
 import toast from 'react-hot-toast'
+import { BuildingOfficeIcon, UserPlusIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
 
 interface User {
   id: string
   email: string
   first_name: string
   last_name: string
-  role: 'admin' | 'analyst' | 'viewer'
+  role: 'client_admin' | 'end_user' | 'analyst' | 'viewer'
   organisation_id: string
   is_active: boolean
+  created_at: string
+  last_login?: string
+  invitation_status: 'pending' | 'accepted' | 'expired'
 }
 
 interface CreateUserForm {
   email: string
   first_name: string
   last_name: string
-  role: 'admin' | 'analyst' | 'viewer'
+  role: 'client_admin' | 'end_user' | 'analyst' | 'viewer'
+  send_invitation: boolean
 }
 
 export default function UsersPage() {
@@ -36,18 +42,31 @@ export default function UsersPage() {
     email: '',
     first_name: '',
     last_name: '',
-    role: 'viewer'
+    role: 'end_user',
+    send_invitation: true
   })
   const { user: currentUser } = useAuthContext()
+  const { currentOrganisation, isSuperAdmin } = useOrganisationContext()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedRole, setSelectedRole] = useState('all')
 
   useEffect(() => {
     fetchUsers()
   }, [])
 
+  // Refresh users when organization changes
+  useEffect(() => {
+    if (currentOrganisation) {
+      fetchUsers()
+    }
+  }, [currentOrganisation])
+
   const fetchUsers = async () => {
     try {
       setIsLoading(true)
-      const response = await apiService.get<User[]>('/users/')
+      // Fetch organization-scoped users
+      const endpoint = isSuperAdmin ? '/users/' : `/organizations/${currentOrganisation?.id}/users/`
+      const response = await apiService.get<User[]>(endpoint)
       setUsers(response)
     } catch (error) {
       console.error('Failed to fetch users:', error)
@@ -59,13 +78,40 @@ export default function UsersPage() {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!currentOrganisation && !isSuperAdmin) {
+      toast.error('No organization context available')
+      return
+    }
+
     try {
       setIsCreating(true)
-      const newUser = await apiService.post<User>('/users/', formData)
+      const userData = {
+        ...formData,
+        organisation_id: currentOrganisation?.id || null
+      }
+      
+      // Create user with organization context
+      const endpoint = isSuperAdmin ? '/users/' : `/organizations/${currentOrganisation?.id}/users/`
+      const newUser = await apiService.post<User>(endpoint, userData)
+      
+      // Send invitation email if requested
+      if (formData.send_invitation) {
+        try {
+          await apiService.post(`/users/${newUser.id}/invite`, {
+            organization_name: currentOrganisation?.name
+          })
+          toast.success('User created and invitation sent')
+        } catch (inviteError) {
+          console.warn('User created but invitation failed:', inviteError)
+          toast.success('User created successfully (invitation email failed)')
+        }
+      } else {
+        toast.success('User created successfully')
+      }
+      
       setUsers([...users, newUser])
       setIsModalOpen(false)
-      setFormData({ email: '', first_name: '', last_name: '', role: 'viewer' })
-      toast.success('User created successfully')
+      resetForm()
     } catch (error: any) {
       console.error('Failed to create user:', error)
       toast.error(error?.response?.data?.detail || 'Failed to create user')
@@ -96,8 +142,32 @@ export default function UsersPage() {
 
   const openCreateModal = () => {
     setEditingUser(null)
-    setFormData({ email: '', first_name: '', last_name: '', role: 'viewer' })
+    resetForm()
     setIsModalOpen(true)
+  }
+
+  const resetForm = () => {
+    setFormData({ 
+      email: '', 
+      first_name: '', 
+      last_name: '', 
+      role: 'end_user',
+      send_invitation: true
+    })
+  }
+
+  const handleResendInvitation = async (userId: string) => {
+    try {
+      await apiService.post(`/users/${userId}/resend-invite`, {
+        organization_name: currentOrganisation?.name
+      })
+      toast.success('Invitation resent successfully')
+      // Refresh users to update invitation status
+      fetchUsers()
+    } catch (error: any) {
+      console.error('Failed to resend invitation:', error)
+      toast.error(error?.response?.data?.detail || 'Failed to resend invitation')
+    }
   }
 
   const openEditModal = (user: User) => {
@@ -114,22 +184,44 @@ export default function UsersPage() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingUser(null)
-    setFormData({ email: '', first_name: '', last_name: '', role: 'viewer' })
+    resetForm()
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
+    const { name, value, type } = e.target
+    const checked = (e.target as HTMLInputElement).checked
+    setFormData(prev => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }))
   }
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
-      case 'admin': return 'bg-red-100 text-red-800'
+      case 'client_admin': return 'bg-purple-100 text-purple-800'
+      case 'end_user': return 'bg-green-100 text-green-800'
       case 'analyst': return 'bg-blue-100 text-blue-800'
       case 'viewer': return 'bg-gray-100 text-gray-800'
       default: return 'bg-gray-100 text-gray-800'
     }
   }
+
+  const getInvitationStatusColor = (status: string) => {
+    switch (status) {
+      case 'accepted': return 'bg-green-100 text-green-800'
+      case 'pending': return 'bg-yellow-100 text-yellow-800'
+      case 'expired': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesRole = selectedRole === 'all' || user.role === selectedRole
+    return matchesSearch && matchesRole
+  })
 
   if (isLoading) {
     return (
@@ -142,21 +234,63 @@ export default function UsersPage() {
   return (
     <DashboardLayout>
       <div className="max-w-6xl mx-auto">
-      <div className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Users</h1>
-          <p className="text-gray-600 mt-2">Manage users in your organisation</p>
+      <div className="mb-8">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+            <div className="flex items-center gap-2 mt-2">
+              <BuildingOfficeIcon className="h-5 w-5 text-gray-500" />
+              <p className="text-gray-600">
+                {currentOrganisation ? `Managing users for ${currentOrganisation.name}` : 'All Users'}
+              </p>
+            </div>
+          </div>
+          {(currentUser?.role === 'admin' || currentUser?.role === 'client_admin') && (
+            <Button 
+              onClick={openCreateModal} 
+              className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+            >
+              <UserPlusIcon className="h-5 w-5" />
+              Add User
+            </Button>
+          )}
         </div>
-        {currentUser?.role === 'admin' && (
-          <Button onClick={openCreateModal} className="bg-indigo-600 hover:bg-indigo-700 text-white">
-            Add User
-          </Button>
-        )}
+
+        {/* Search and Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search users by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div className="sm:w-48">
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="all">All Roles</option>
+              <option value="client_admin">Client Admin</option>
+              <option value="end_user">End User</option>
+              <option value="analyst">Analyst</option>
+              <option value="viewer">Viewer</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">Organisation Users</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-medium text-gray-900">Organization Users</h2>
+            <div className="text-sm text-gray-500">
+              {filteredUsers.length} of {users.length} users
+            </div>
+          </div>
         </div>
         
         <div className="overflow-x-auto">
@@ -173,12 +307,15 @@ export default function UsersPage() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Invitation
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <tr key={user.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
@@ -200,17 +337,37 @@ export default function UsersPage() {
                       {user.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getInvitationStatusColor(user.invitation_status)}`}>
+                      {user.invitation_status.charAt(0).toUpperCase() + user.invitation_status.slice(1)}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {currentUser?.role === 'admin' && user.id !== currentUser.id && (
-                      <Button 
-                        size="sm" 
-                        variant="secondary"
-                        onClick={() => openEditModal(user)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                      >
-                        Edit
-                      </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {(currentUser?.role === 'admin' || currentUser?.role === 'client_admin') && user.id !== currentUser.id && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="secondary"
+                            onClick={() => openEditModal(user)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Edit
+                          </Button>
+                          {user.invitation_status === 'expired' && (
+                            <Button 
+                              size="sm" 
+                              variant="secondary"
+                              onClick={() => handleResendInvitation(user.id)}
+                              className="text-green-600 hover:text-green-900 flex items-center gap-1"
+                            >
+                              <EnvelopeIcon className="h-4 w-4" />
+                              Resend
+                            </Button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -218,9 +375,17 @@ export default function UsersPage() {
           </table>
         </div>
 
+        {filteredUsers.length === 0 && users.length > 0 && (
+          <div className="text-center py-8">
+            <p className="text-gray-500">No users match your search criteria</p>
+          </div>
+        )}
+        
         {users.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-gray-500">No users found</p>
+            <UserPlusIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">No users found in this organization</p>
+            <p className="text-gray-400 text-sm mt-1">Create your first user to get started</p>
           </div>
         )}
       </div>
@@ -292,11 +457,34 @@ export default function UsersPage() {
               onChange={handleInputChange}
               className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
             >
-              <option value="viewer">Viewer</option>
+              <option value="end_user">End User</option>
               <option value="analyst">Analyst</option>
-              <option value="admin">Admin</option>
+              <option value="client_admin">Client Admin</option>
+              {isSuperAdmin && <option value="viewer">Viewer</option>}
             </select>
+            <p className="mt-1 text-xs text-gray-500">
+              {formData.role === 'client_admin' && 'Can manage users within this organization'}
+              {formData.role === 'end_user' && 'Can access competitive intelligence tools'}
+              {formData.role === 'analyst' && 'Can access advanced analytics features'}
+            </p>
           </div>
+
+          {!editingUser && (
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="send_invitation"
+                name="send_invitation"
+                checked={formData.send_invitation}
+                onChange={handleInputChange}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+              <label htmlFor="send_invitation" className="text-sm text-gray-700 flex items-center gap-2">
+                <EnvelopeIcon className="h-4 w-4 text-gray-500" />
+                Send invitation email to user
+              </label>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button

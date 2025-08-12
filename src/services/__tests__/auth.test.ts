@@ -1,10 +1,15 @@
 /**
- * Authentication Service Tests
- * Comprehensive tests achieving 85%+ coverage for auth.ts
+ * Enhanced Authentication Service Tests
+ * Comprehensive tests for multi-tenant auth with permissions, token refresh, and session management
  */
 
 import { AuthService, authService } from '../auth'
 import { LoginRequest } from '@/types/auth'
+import { apiService } from '../api'
+
+// Mock dependencies
+jest.mock('../api')
+const mockApiService = apiService as jest.Mocked<typeof apiService>
 
 // Mock js-cookie
 const mockCookies = {
@@ -13,6 +18,25 @@ const mockCookies = {
   remove: jest.fn(),
 }
 jest.mock('js-cookie', () => mockCookies)
+
+// Mock localStorage
+const mockLocalStorage = {
+  store: {} as Record<string, string>,
+  getItem: jest.fn((key: string) => mockLocalStorage.store[key] || null),
+  setItem: jest.fn((key: string, value: string) => {
+    mockLocalStorage.store[key] = value
+  }),
+  removeItem: jest.fn((key: string) => {
+    delete mockLocalStorage.store[key]
+  }),
+  clear: jest.fn(() => {
+    mockLocalStorage.store = {}
+  })
+}
+
+Object.defineProperty(window, 'localStorage', {
+  value: mockLocalStorage
+})
 
 // Mock window.location for logout redirect
 const mockLocation = { href: '' }
@@ -25,6 +49,12 @@ describe('AuthService', () => {
     service = new AuthService()
     jest.clearAllMocks()
     mockLocation.href = ''
+    mockLocalStorage.clear()
+    
+    // Reset mock implementations
+    mockCookies.get.mockReturnValue(undefined)
+    mockCookies.set.mockReturnValue(undefined)
+    mockCookies.remove.mockReturnValue(undefined)
   })
 
   describe('login', () => {
@@ -183,6 +213,259 @@ describe('AuthService', () => {
 
       expect(() => service.logout()).not.toThrow()
       expect(mockLocation.href).toBe('/login')
+    })
+  })
+
+  // Enhanced Authentication Tests
+  describe('Enhanced Authentication Features', () => {
+    describe('refreshToken', () => {
+      it('should refresh token successfully', async () => {
+        const mockRefreshToken = 'mock_refresh_token'
+        mockCookies.get.mockImplementation((key) => {
+          if (key === 'refresh_token') return mockRefreshToken
+          return undefined
+        })
+
+        const mockResponse = {
+          access_token: 'new_access_token',
+          refresh_token: 'new_refresh_token',
+          token_type: 'bearer',
+          expires_in: 3600,
+          user: {
+            id: 'user123',
+            email: 'test@example.com',
+            role: 'admin',
+            organisation_id: 'org456'
+          },
+          tenant: {
+            id: 'org456',
+            name: 'Test Organization',
+            industry: 'Technology',
+            subscription_plan: 'basic'
+          },
+          permissions: ['read:users']
+        }
+
+        mockApiService.post.mockResolvedValue(mockResponse)
+
+        const result = await service.refreshToken()
+
+        expect(mockApiService.post).toHaveBeenCalledWith('/auth/refresh', {
+          refresh_token: mockRefreshToken
+        })
+        expect(result).toEqual(mockResponse)
+      })
+
+      it('should handle missing refresh token', async () => {
+        mockCookies.get.mockReturnValue(undefined)
+
+        await expect(service.refreshToken()).rejects.toThrow('No refresh token available')
+      })
+    })
+
+    describe('permission management', () => {
+      beforeEach(() => {
+        const permissions = ['read:users', 'write:users', 'read:organizations']
+        mockLocalStorage.setItem('user_permissions', JSON.stringify(permissions))
+      })
+
+      it('should check single permission correctly', () => {
+        expect(service.hasPermission('read:users')).toBe(true)
+        expect(service.hasPermission('delete:users')).toBe(false)
+      })
+
+      it('should check multiple permissions correctly', () => {
+        expect(service.hasAnyPermission(['read:users', 'admin:all'])).toBe(true)
+        expect(service.hasAnyPermission(['delete:users', 'admin:all'])).toBe(false)
+      })
+
+      it('should handle missing permissions gracefully', () => {
+        mockLocalStorage.removeItem('user_permissions')
+        
+        expect(service.hasPermission('read:users')).toBe(false)
+        expect(service.hasAnyPermission(['read:users'])).toBe(false)
+      })
+    })
+
+    describe('tenant information', () => {
+      it('should return tenant info when available', () => {
+        const tenantInfo = {
+          id: 'org456',
+          name: 'Test Organization',
+          industry: 'Technology',
+          subscription_plan: 'basic'
+        }
+
+        mockLocalStorage.setItem('tenant_info', JSON.stringify(tenantInfo))
+
+        const result = service.getTenantInfo()
+
+        expect(result).toEqual(tenantInfo)
+      })
+
+      it('should return null when no tenant info exists', () => {
+        const result = service.getTenantInfo()
+
+        expect(result).toBeNull()
+      })
+
+      it('should handle corrupted tenant data gracefully', () => {
+        mockLocalStorage.setItem('tenant_info', 'invalid json')
+
+        const result = service.getTenantInfo()
+
+        expect(result).toBeNull()
+      })
+    })
+
+    describe('token refresh logic', () => {
+      it('should determine when token needs refresh', () => {
+        // Set token expiry to 2 minutes from now
+        const expiryTime = new Date(Date.now() + 2 * 60 * 1000)
+        mockLocalStorage.setItem('token_expires_at', expiryTime.toISOString())
+
+        // Should need refresh (within 5 minute threshold)
+        expect(service.shouldRefreshToken()).toBe(true)
+      })
+
+      it('should not refresh when token has plenty of time left', () => {
+        // Set token expiry to 10 minutes from now
+        const expiryTime = new Date(Date.now() + 10 * 60 * 1000)
+        mockLocalStorage.setItem('token_expires_at', expiryTime.toISOString())
+
+        // Should not need refresh
+        expect(service.shouldRefreshToken()).toBe(false)
+      })
+
+      it('should handle missing expiry time', () => {
+        mockLocalStorage.removeItem('token_expires_at')
+        
+        expect(service.shouldRefreshToken()).toBe(false)
+      })
+    })
+
+    describe('ensureValidToken', () => {
+      it('should return token if valid and not expiring soon', async () => {
+        const mockToken = 'valid_token'
+        mockCookies.get.mockReturnValue(mockToken)
+        
+        // Set expiry far in future
+        const expiryTime = new Date(Date.now() + 30 * 60 * 1000)
+        mockLocalStorage.setItem('token_expires_at', expiryTime.toISOString())
+
+        const result = await service.ensureValidToken()
+
+        expect(result).toBe(mockToken)
+      })
+
+      it('should refresh token if expiring soon', async () => {
+        const oldToken = 'old_token'
+        const newToken = 'new_token'
+        
+        mockCookies.get
+          .mockReturnValueOnce(oldToken) // First call returns old token
+          .mockReturnValue(newToken) // Subsequent calls return new token
+
+        // Set expiry to 2 minutes from now (within refresh threshold)
+        const expiryTime = new Date(Date.now() + 2 * 60 * 1000)
+        mockLocalStorage.setItem('token_expires_at', expiryTime.toISOString())
+
+        const mockRefreshResponse = {
+          access_token: newToken,
+          refresh_token: 'new_refresh',
+          expires_in: 3600,
+          user: { id: 'user123' },
+          tenant: { id: 'org456' },
+          permissions: []
+        }
+
+        mockApiService.post.mockResolvedValue(mockRefreshResponse)
+
+        const result = await service.ensureValidToken()
+
+        expect(mockApiService.post).toHaveBeenCalledWith('/auth/refresh', expect.any(Object))
+        expect(result).toBe(newToken)
+      })
+    })
+
+    describe('enhanced logout', () => {
+      it('should logout with server-side token revocation', async () => {
+        const mockRefreshToken = 'refresh_token'
+        mockCookies.get.mockReturnValue(mockRefreshToken)
+        mockApiService.post.mockResolvedValue({ message: 'Logout successful' })
+
+        await service.logout(false)
+
+        expect(mockApiService.post).toHaveBeenCalledWith('/auth/logout', {
+          refresh_token: mockRefreshToken,
+          all_devices: false
+        })
+
+        // Check that data was cleared
+        expect(mockCookies.remove).toHaveBeenCalledWith('access_token')
+        expect(mockCookies.remove).toHaveBeenCalledWith('refresh_token')
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('current_user')
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('tenant_info')
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith('user_permissions')
+        expect(mockLocation.href).toBe('/login')
+      })
+    })
+
+    describe('session management', () => {
+      it('should check session successfully', async () => {
+        const mockResponse = {
+          authenticated: true,
+          user_id: 'user123',
+          tenant_id: 'org456',
+          role: 'admin',
+          active: true
+        }
+
+        mockApiService.get.mockResolvedValue(mockResponse)
+
+        const result = await service.checkSession()
+
+        expect(mockApiService.get).toHaveBeenCalledWith('/auth/session/check')
+        expect(result).toEqual(mockResponse)
+      })
+
+      it('should extend session when needed', async () => {
+        const mockResponse = {
+          extend_recommended: true,
+          message: 'Token should be refreshed',
+          expires_soon: true
+        }
+
+        mockApiService.post.mockResolvedValue(mockResponse)
+
+        const result = await service.extendSession()
+
+        expect(mockApiService.post).toHaveBeenCalledWith('/auth/session/extend')
+        expect(result).toEqual(mockResponse)
+      })
+    })
+
+    describe('enhanced authentication state', () => {
+      it('should return true for authenticated when token and user exist', () => {
+        mockCookies.get.mockReturnValue('access_token')
+        mockLocalStorage.setItem('current_user', JSON.stringify({ id: 'user123' }))
+
+        expect(service.isAuthenticated()).toBe(true)
+      })
+
+      it('should return false when no token exists', () => {
+        mockCookies.get.mockReturnValue(undefined)
+        mockLocalStorage.setItem('current_user', JSON.stringify({ id: 'user123' }))
+
+        expect(service.isAuthenticated()).toBe(false)
+      })
+
+      it('should return false when no user data exists', () => {
+        mockCookies.get.mockReturnValue('access_token')
+        mockLocalStorage.removeItem('current_user')
+
+        expect(service.isAuthenticated()).toBe(false)
+      })
     })
   })
 })
