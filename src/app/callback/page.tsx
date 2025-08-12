@@ -166,7 +166,7 @@ export default function CallbackPage() {
       router.push('/login')
     }
 
-  }, [searchParams, router, login]) // EMERGENCY FIX: Remove processedCode from dependencies to break infinite loop
+  }, [searchParams, router, login, processedCode]) // EMERGENCY FIX: Include processedCode but with proper guards
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
