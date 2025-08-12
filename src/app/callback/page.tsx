@@ -15,8 +15,36 @@ export default function CallbackPage() {
   const { login } = useAuthContext()
   const router = useRouter()
   const searchParams = useSearchParams()
+  
+  // NUCLEAR OPTION: Disable all useEffect if infinite loop detected
+  const nuclearDisable = useRef(false)
+  
+  // Check for infinite loop pattern
+  const requestCount = useRef(0)
+  const requestTimer = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
+    // NUCLEAR CIRCUIT BREAKER: Check for infinite loop pattern
+    requestCount.current += 1
+    
+    if (requestCount.current > 3) {
+      console.error('NUCLEAR CIRCUIT BREAKER: Infinite loop detected, disabling all callbacks')
+      nuclearDisable.current = true
+      toast.error('Authentication loop detected. Please refresh page and try again.')
+      return
+    }
+    
+    if (nuclearDisable.current) {
+      console.log('NUCLEAR CIRCUIT BREAKER: All callbacks disabled due to infinite loop')
+      return
+    }
+    
+    // Reset counter after 10 seconds
+    if (requestTimer.current) clearTimeout(requestTimer.current)
+    requestTimer.current = setTimeout(() => {
+      requestCount.current = 0
+    }, 10000)
+    
     // EMERGENCY CIRCUIT BREAKER: Absolute prevention of multiple executions
     if (hasRunOnce.current) {
       console.log('EMERGENCY CIRCUIT BREAKER: Callback effect already executed, preventing re-run')
