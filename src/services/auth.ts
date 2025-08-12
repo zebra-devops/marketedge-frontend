@@ -1,6 +1,7 @@
 import { apiService } from './api'
 import { LoginRequest, TokenResponse, User } from '@/types/auth'
 import Cookies from 'js-cookie'
+import { safeSetInterval, safeClearInterval, ensureTimerFunctions } from '@/utils/timer-utils'
 
 interface EnhancedTokenResponse {
   access_token: string
@@ -175,12 +176,12 @@ export class AuthService {
       const timeoutInterval = (window as any).__sessionTimeoutInterval
       
       if (refreshInterval) {
-        clearInterval(refreshInterval)
+        safeClearInterval(refreshInterval)
         delete (window as any).__authRefreshInterval
       }
       
       if (timeoutInterval) {
-        clearInterval(timeoutInterval)
+        safeClearInterval(timeoutInterval)
         delete (window as any).__sessionTimeoutInterval
       }
     }
@@ -333,17 +334,20 @@ export class AuthService {
       return
     }
 
+    // Ensure timer functions are available in production
+    ensureTimerFunctions()
+
     // Clear existing interval if it exists
     const existingInterval = (window as any).__authRefreshInterval
     if (existingInterval) {
-      clearInterval(existingInterval)
+      safeClearInterval(existingInterval)
       delete (window as any).__authRefreshInterval
     }
 
     // Check token status every minute
-    const refreshInterval = setInterval(() => {
+    const refreshInterval = safeSetInterval(() => {
       if (!this.isAuthenticated()) {
-        clearInterval(refreshInterval)
+        safeClearInterval(refreshInterval)
         if (typeof window !== 'undefined') {
           delete (window as any).__authRefreshInterval
         }
@@ -386,10 +390,13 @@ export class AuthService {
   initializeActivityTracking(): void {
     if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') return
 
+    // Ensure timer functions are available in production
+    ensureTimerFunctions()
+
     // Clear existing interval if it exists
     const existingInterval = (window as any).__sessionTimeoutInterval
     if (existingInterval) {
-      clearInterval(existingInterval)
+      safeClearInterval(existingInterval)
       delete (window as any).__sessionTimeoutInterval
     }
 
@@ -405,9 +412,9 @@ export class AuthService {
     })
 
     // Check for session timeout every 5 minutes
-    const timeoutCheckInterval = setInterval(() => {
+    const timeoutCheckInterval = safeSetInterval(() => {
       if (!this.isAuthenticated()) {
-        clearInterval(timeoutCheckInterval)
+        safeClearInterval(timeoutCheckInterval)
         if (typeof window !== 'undefined') {
           delete (window as any).__sessionTimeoutInterval
         }

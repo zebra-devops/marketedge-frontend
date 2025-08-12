@@ -3,6 +3,7 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { User } from '@/types/auth'
 import { authService } from '@/services/auth'
+import { safeClearInterval, ensureTimerFunctions } from '@/utils/timer-utils'
 
 interface EnhancedUser extends User {
   created_at?: string
@@ -65,6 +66,9 @@ export const useAuth = (): AuthContextType => {
   // Initialize timer-based features only on client-side after mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Ensure timer functions are available before initialization
+      ensureTimerFunctions()
+      
       // Initialize auto-refresh and activity tracking
       authService.initializeAutoRefresh()
       authService.initializeActivityTracking()
@@ -75,12 +79,12 @@ export const useAuth = (): AuthContextType => {
         const timeoutInterval = (window as any).__sessionTimeoutInterval
         
         if (refreshInterval) {
-          clearInterval(refreshInterval)
+          safeClearInterval(refreshInterval)
           delete (window as any).__authRefreshInterval
         }
         
         if (timeoutInterval) {
-          clearInterval(timeoutInterval)
+          safeClearInterval(timeoutInterval)
           delete (window as any).__sessionTimeoutInterval
         }
       }
