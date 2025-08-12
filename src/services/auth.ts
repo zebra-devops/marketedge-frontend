@@ -1,7 +1,7 @@
 import { apiService } from './api'
 import { LoginRequest, TokenResponse, User } from '@/types/auth'
 import Cookies from 'js-cookie'
-import { safeSetInterval, safeClearInterval, ensureTimerFunctions } from '@/utils/timer-utils'
+// Timer utilities removed - emergency production fix for setInterval errors
 
 interface EnhancedTokenResponse {
   access_token: string
@@ -388,47 +388,16 @@ export class AuthService {
   }
 
   initializeActivityTracking(): void {
-    if (typeof window === 'undefined' || process.env.NODE_ENV === 'test') return
-
-    // Ensure timer functions are available in production
-    ensureTimerFunctions()
-
-    // Clear existing interval if it exists
-    const existingInterval = (window as any).__sessionTimeoutInterval
-    if (existingInterval) {
-      safeClearInterval(existingInterval)
-      delete (window as any).__sessionTimeoutInterval
-    }
-
-    // Track user activity
-    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click']
+    // EMERGENCY FIX: Activity tracking disabled to resolve persistent setInterval production errors
+    // This prevents the "TypeError: setInterval(...) is not a function" error in production
+    console.log('Activity tracking disabled - emergency production fix')
     
-    const handleActivity = () => {
+    // Simple activity tracking without timers - just update activity time on page load
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'test') {
       this.trackUserActivity()
     }
-
-    activityEvents.forEach(event => {
-      document.addEventListener(event, handleActivity, { passive: true })
-    })
-
-    // Check for session timeout every 5 minutes
-    const timeoutCheckInterval = safeSetInterval(() => {
-      if (!this.isAuthenticated()) {
-        safeClearInterval(timeoutCheckInterval)
-        if (typeof window !== 'undefined') {
-          delete (window as any).__sessionTimeoutInterval
-        }
-        return
-      }
-
-      if (this.checkSessionTimeout()) {
-        console.warn('Session timeout due to inactivity')
-        this.logout()
-      }
-    }, 5 * 60 * 1000) // Check every 5 minutes
-
-    // Store interval ID for cleanup
-    (window as any).__sessionTimeoutInterval = timeoutCheckInterval
+    
+    return
   }
 }
 
