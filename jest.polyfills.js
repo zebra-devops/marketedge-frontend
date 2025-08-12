@@ -47,3 +47,31 @@ if (!global.BroadcastChannel) {
     removeEventListener() {}
   }
 }
+
+// Timer functions polyfill - essential for Auth Service activity tracking
+// Ensure timer functions are available globally before Jest setup runs
+if (typeof global.setInterval === 'undefined') {
+  global.setInterval = function(callback, delay, ...args) {
+    // Return a mock ID for testing
+    return Math.random()
+  }
+}
+
+if (typeof global.setTimeout === 'undefined') {
+  global.setTimeout = function(callback, delay, ...args) {
+    // Return a mock ID for testing
+    return Math.random()
+  }
+}
+
+if (typeof global.clearInterval === 'undefined') {
+  global.clearInterval = function(id) {
+    // No-op for testing
+  }
+}
+
+if (typeof global.clearTimeout === 'undefined') {
+  global.clearTimeout = function(id) {
+    // No-op for testing
+  }
+}

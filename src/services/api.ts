@@ -1,9 +1,11 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios'
 import Cookies from 'js-cookie'
 import { TokenResponse, RefreshTokenRequest } from '@/types/auth'
+import { Organisation, OrganisationCreate, IndustryOption } from '@/types/api'
 
 class ApiService {
   private client: AxiosInstance
+  private currentOrganizationId: string | null = null
 
   constructor() {
     this.client = axios.create({
@@ -16,6 +18,14 @@ class ApiService {
     this.setupInterceptors()
   }
 
+  setOrganizationContext(organizationId: string) {
+    this.currentOrganizationId = organizationId
+  }
+
+  clearOrganizationContext() {
+    this.currentOrganizationId = null
+  }
+
   private setupInterceptors() {
     this.client.interceptors.request.use(
       (config) => {
@@ -23,6 +33,12 @@ class ApiService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
+        
+        // Add organization context header if set
+        if (this.currentOrganizationId) {
+          config.headers['X-Organization-ID'] = this.currentOrganizationId
+        }
+        
         return config
       },
       (error) => Promise.reject(error)
@@ -86,6 +102,44 @@ class ApiService {
       data
     )
     return response.data
+  }
+
+  // Organisation Management Methods
+  async createOrganisation(data: OrganisationCreate): Promise<Organisation> {
+    return this.post<Organisation>('/organisations', data)
+  }
+
+  async getAllOrganisations(): Promise<Organisation[]> {
+    return this.get<Organisation[]>('/organisations')
+  }
+
+  async getCurrentOrganisation(): Promise<Organisation> {
+    return this.get<Organisation>('/organisations/current')
+  }
+
+  async updateCurrentOrganisation(data: Partial<OrganisationCreate>): Promise<Organisation> {
+    return this.put<Organisation>('/organisations/current', data)
+  }
+
+  async getAvailableIndustries(): Promise<IndustryOption[]> {
+    return this.get<IndustryOption[]>('/organisations/industries')
+  }
+
+  async getOrganisationStats(): Promise<Record<string, any>> {
+    return this.get<Record<string, any>>('/organisations/stats')
+  }
+
+  // Organization Switching Methods
+  async getUserAccessibleOrganisations(): Promise<Organisation[]> {
+    return this.get<Organisation[]>('/organisations/accessible')
+  }
+
+  async logOrganizationSwitch(organizationId: string): Promise<void> {
+    return this.post<void>('/audit/organization-switch', { 
+      organization_id: organizationId,
+      timestamp: new Date().toISOString(),
+      user_agent: navigator.userAgent
+    })
   }
 }
 

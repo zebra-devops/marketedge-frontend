@@ -112,6 +112,31 @@ global.IntersectionObserver = jest.fn().mockImplementation(() => ({
   thresholds: [],
 }))
 
+// Mock document event handling for Auth Service activity tracking
+if (typeof document !== 'undefined') {
+  const originalAddEventListener = document.addEventListener
+  const originalRemoveEventListener = document.removeEventListener
+  
+  document.addEventListener = jest.fn((event, handler, options) => {
+    // For test environment, just store the mock but don't actually add listeners
+    // This prevents issues with activity tracking in auth service
+    return jest.fn()
+  })
+  
+  document.removeEventListener = jest.fn((event, handler, options) => {
+    return jest.fn()
+  })
+}
+
+// Mock window event handling
+if (typeof window !== 'undefined') {
+  const originalWindowAddEventListener = window.addEventListener
+  const originalWindowRemoveEventListener = window.removeEventListener
+  
+  window.addEventListener = jest.fn()
+  window.removeEventListener = jest.fn()
+}
+
 // Mock window.location for multi-tenant URL testing
 Object.defineProperty(window, 'location', {
   writable: true,

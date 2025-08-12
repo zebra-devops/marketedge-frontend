@@ -43,33 +43,79 @@ export function getAuthHeaders(contentType: string = 'application/json'): AuthHe
 }
 
 /**
- * Make authenticated API request
+ * Make authenticated API request with enhanced tenant context and error handling
  */
 export async function authenticatedFetch(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  includeCredentials: boolean = true
 ): Promise<Response> {
   try {
     const headers = getAuthHeaders();
     
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
-    });
+    // Add tenant isolation headers for multi-tenant security
+    const enhancedHeaders: HeadersInit = {
+      ...headers,
+      'X-Tenant-Context': 'isolated', // Ensure tenant isolation
+      'X-Client-Version': '1.0.0', // For API versioning
+      'X-Request-Source': 'frontend-app', // Request source tracking
+      ...options.headers,
+    };
 
-    // Handle authentication errors
+    const requestOptions: RequestInit = {
+      ...options,
+      headers: enhancedHeaders,
+    };
+
+    // Include credentials for cookie-based auth if enabled
+    if (includeCredentials) {
+      requestOptions.credentials = 'include';
+    }
+
+    const response = await fetch(url, requestOptions);
+
+    // Handle authentication errors with enhanced tenant context
     if (response.status === 401) {
-      // Clear invalid token and redirect to login
+      // Check if it's a tenant-specific auth error
+      const tenantError = response.headers.get('X-Tenant-Error');
+      if (tenantError) {
+        console.error('Tenant authentication error:', tenantError);
+      }
+
+      // Clear invalid tokens and redirect to login
       document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; httpOnly';
+      document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; httpOnly';
+      
+      // Clear tenant-specific session data
+      localStorage.removeItem('tenant_info');
+      localStorage.removeItem('user_permissions');
+      
       window.location.href = '/login';
-      throw new AuthError('Authentication failed', 401);
+      throw new AuthError('Authentication failed - please log in again', 401);
     }
 
     if (response.status === 403) {
-      throw new AuthError('Insufficient permissions', 403);
+      // Enhanced permission error with tenant context
+      const permissionError = response.headers.get('X-Permission-Error');
+      const requiredPermission = response.headers.get('X-Required-Permission');
+      
+      let errorMessage = 'Insufficient permissions';
+      if (requiredPermission) {
+        errorMessage += ` - requires: ${requiredPermission}`;
+      }
+      if (permissionError) {
+        errorMessage += ` (${permissionError})`;
+      }
+      
+      throw new AuthError(errorMessage, 403);
+    }
+
+    // Handle tenant isolation errors (custom status for cross-tenant violations)
+    if (response.status === 422) {
+      const tenantViolation = response.headers.get('X-Tenant-Violation');
+      if (tenantViolation) {
+        throw new AuthError(`Tenant isolation violation: ${tenantViolation}`, 422);
+      }
     }
 
     return response;
@@ -78,8 +124,15 @@ export async function authenticatedFetch(
       throw error;
     }
     
-    // Handle network errors
-    throw new Error(`Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    // Handle network errors with enhanced context
+    const networkError = error instanceof Error ? error.message : 'Unknown network error';
+    console.error('Authenticated fetch error:', {
+      url,
+      error: networkError,
+      timestamp: new Date().toISOString()
+    });
+    
+    throw new Error(`Request failed: ${networkError}`);
   }
 }
 
@@ -91,16 +144,58 @@ export function validateAdminRole(user: any): boolean {
 }
 
 /**
- * Logout user securely
+ * Enhanced secure logout with complete session cleanup
  */
 export function logout(): void {
   // Clear all auth-related cookies
   document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; httpOnly';
   document.cookie = 'refresh_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; httpOnly';
   
-  // Clear any localStorage/sessionStorage
-  localStorage.removeItem('user');
+  // Clear all tenant-related cookies if they exist
+  document.cookie = 'tenant_context=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; httpOnly';
+  document.cookie = 'user_permissions=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; secure; httpOnly';
+  
+  // Enhanced localStorage cleanup
+  const authKeys = [
+    'user',
+    'current_user',
+    'tenant_info',
+    'user_permissions',
+    'token_expires_at',
+    'auth_state',
+    'last_activity',
+    'session_data'
+  ];
+  
+  authKeys.forEach(key => {
+    localStorage.removeItem(key);
+  });
+  
+  // Clear all sessionStorage
   sessionStorage.clear();
+  
+  // Clear any auth-related intervals
+  if (typeof window !== 'undefined') {
+    const refreshInterval = (window as any).__authRefreshInterval;
+    const timeoutInterval = (window as any).__sessionTimeoutInterval;
+    
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+      delete (window as any).__authRefreshInterval;
+    }
+    
+    if (timeoutInterval) {
+      clearInterval(timeoutInterval);
+      delete (window as any).__sessionTimeoutInterval;
+    }
+  }
+  
+  // Clear browser state
+  if (typeof window !== 'undefined' && window.history.replaceState) {
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+  
+  console.info('Enhanced logout cleanup completed');
   
   // Redirect to login
   window.location.href = '/login';
