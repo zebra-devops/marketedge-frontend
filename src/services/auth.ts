@@ -1,7 +1,7 @@
 import { apiService } from './api'
 import { LoginRequest, TokenResponse, User } from '@/types/auth'
 import Cookies from 'js-cookie'
-// Timer utilities removed - emergency production fix for setInterval errors
+import { safeClearInterval, safeSetInterval, ensureTimerFunctions } from '@/utils/timer-utils'
 
 interface EnhancedTokenResponse {
   access_token: string
@@ -43,16 +43,70 @@ interface LogoutRequest {
 
 export class AuthService {
   private refreshTokenPromise: Promise<EnhancedTokenResponse> | null = null
+  private loginPromise: Promise<EnhancedTokenResponse> | null = null
   private readonly tokenRefreshThreshold = 5 * 60 * 1000 // 5 minutes in milliseconds
+  private processedAuthCodes: Set<string> = new Set()
 
   async login(loginData: LoginRequest & { state?: string }): Promise<EnhancedTokenResponse> {
-    const response = await apiService.post<EnhancedTokenResponse>('/auth/login', loginData)
+    // EMERGENCY CIRCUIT BREAKER: Prevent duplicate requests with the same auth code
+    if (this.processedAuthCodes.has(loginData.code)) {
+      console.error('EMERGENCY CIRCUIT BREAKER: Authentication code has already been processed:', loginData.code.substring(0, 10) + '...')
+      throw new Error('Authentication code has already been processed')
+    }
+
+    // EMERGENCY CIRCUIT BREAKER: Prevent multiple concurrent login requests
+    if (this.loginPromise) {
+      console.error('EMERGENCY CIRCUIT BREAKER: Login already in progress, rejecting duplicate request')
+      throw new Error('Login already in progress')
+    }
+
+    // Mark this auth code as being processed IMMEDIATELY
+    this.processedAuthCodes.add(loginData.code)
+    console.log('EMERGENCY CIRCUIT BREAKER: Auth code marked as processed:', loginData.code.substring(0, 10) + '...')
+
+    console.log('Initiating login request to backend')
     
-    // Store token metadata
-    this.setTokens(response)
-    this.setUserData(response.user, response.tenant, response.permissions)
-    
-    return response
+    this.loginPromise = (async () => {
+      try {
+        const response = await apiService.post<EnhancedTokenResponse>('/auth/login', loginData)
+        
+        console.log('Login response received from backend')
+        
+        // Store token metadata
+        this.setTokens(response)
+        this.setUserData(response.user, response.tenant, response.permissions)
+        
+        // Clean up processed auth codes (keep only recent ones to prevent memory leak)
+        if (this.processedAuthCodes.size > 10) {
+          this.processedAuthCodes.clear()
+        }
+        
+        return response
+      } catch (error: any) {
+        // Remove the failed auth code from processed set to allow retry
+        this.processedAuthCodes.delete(loginData.code)
+        
+        console.error('Login request failed:', error)
+        
+        // Handle specific backend errors
+        if (error?.response?.status === 429) {
+          throw new Error('Too many login attempts. Please wait and try again.')
+        } else if (error?.response?.status === 400) {
+          throw new Error('Invalid authorization code. Please try logging in again.')
+        } else if (error?.response?.status === 401) {
+          throw new Error('Authentication failed. Please try logging in again.')
+        } else if (error?.message?.includes('ERR_INSUFFICIENT_RESOURCES')) {
+          throw new Error('Server overloaded. Please wait and try again.')
+        }
+        
+        throw error
+      } finally {
+        // Clear the login promise after completion
+        this.loginPromise = null
+      }
+    })()
+
+    return this.loginPromise
   }
 
   async refreshToken(): Promise<EnhancedTokenResponse> {

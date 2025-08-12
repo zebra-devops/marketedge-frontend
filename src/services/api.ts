@@ -10,6 +10,7 @@ class ApiService {
   constructor() {
     this.client = axios.create({
       baseURL: process.env.NEXT_PUBLIC_API_BASE_URL + '/api/v1',
+      timeout: 30000, // 30 second timeout
       headers: {
         'Content-Type': 'application/json',
       },
@@ -49,6 +50,20 @@ class ApiService {
       async (error) => {
         const originalRequest = error.config
 
+        // Handle specific error cases that should not trigger retries
+        if (error?.message?.includes('ERR_INSUFFICIENT_RESOURCES') || 
+            error?.code === 'ERR_INSUFFICIENT_RESOURCES') {
+          console.error('Network resource exhaustion detected:', error)
+          return Promise.reject(new Error('Server overloaded. Please wait and try again.'))
+        }
+
+        // Handle rate limiting
+        if (error.response?.status === 429) {
+          console.error('Rate limit exceeded:', error)
+          return Promise.reject(new Error('Too many requests. Please wait and try again.'))
+        }
+
+        // Handle 401 with token refresh (but prevent infinite loops)
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true
 
@@ -61,9 +76,24 @@ class ApiService {
               return this.client(originalRequest)
             }
           } catch (refreshError) {
+            console.error('Token refresh failed during 401 handling:', refreshError)
             this.clearTokens()
-            window.location.href = '/login'
+            // Prevent multiple redirects by checking current location
+            if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+              window.location.href = '/login'
+            }
           }
+        }
+
+        // Handle network errors with better messaging
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+          console.error('Request timeout:', error)
+          return Promise.reject(new Error('Request timed out. Please try again.'))
+        }
+
+        if (error.code === 'ERR_NETWORK') {
+          console.error('Network error:', error)
+          return Promise.reject(new Error('Network error. Please check your connection.'))
         }
 
         return Promise.reject(error)
