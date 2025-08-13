@@ -350,9 +350,33 @@ export class AuthService {
 
   private setTokens(tokenResponse: EnhancedTokenResponse): void {
     // Set HTTP-only cookies are handled by the server
-    // Store token expiry for refresh logic
-    const expiryTime = new Date(Date.now() + (tokenResponse.expires_in * 1000))
-    localStorage.setItem('token_expires_at', expiryTime.toISOString())
+    // Store token expiry for refresh logic with defensive validation
+    try {
+      const expiresInSeconds = tokenResponse.expires_in || 3600 // Default to 1 hour if not provided
+      const expiresInMilliseconds = Number(expiresInSeconds) * 1000
+      
+      // Validate that we have a valid number
+      if (isNaN(expiresInMilliseconds) || expiresInMilliseconds <= 0) {
+        throw new Error(`Invalid expires_in value: ${tokenResponse.expires_in}`)
+      }
+      
+      const expiryTime = new Date(Date.now() + expiresInMilliseconds)
+      
+      // Validate the date is valid before converting to ISO string
+      if (isNaN(expiryTime.getTime())) {
+        throw new Error(`Invalid expiry date calculated from expires_in: ${tokenResponse.expires_in}`)
+      }
+      
+      localStorage.setItem('token_expires_at', expiryTime.toISOString())
+      
+      console.log(`Token expiry set: ${expiryTime.toISOString()} (expires_in: ${expiresInSeconds}s)`)
+    } catch (error) {
+      console.error('Error setting token expiry time:', error)
+      // Fallback: set expiry to 1 hour from now
+      const fallbackExpiry = new Date(Date.now() + 3600000) // 1 hour
+      localStorage.setItem('token_expires_at', fallbackExpiry.toISOString())
+      console.warn(`Using fallback token expiry: ${fallbackExpiry.toISOString()}`)
+    }
   }
 
   private setUserData(user: User, tenant: any, permissions: string[]): void {
