@@ -15,9 +15,22 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-RENDER_YAML="render.yaml"
+RENDER_YAML="../backend/render.yaml"
+DOCKERFILE_PATH="../backend/Dockerfile"
 ENVIRONMENT="${1:-staging}"
 BRANCH="${2:-main}"
+
+# Auto-detect project structure
+if [ -f "backend/render.yaml" ]; then
+    RENDER_YAML="backend/render.yaml"
+    DOCKERFILE_PATH="backend/Dockerfile"
+elif [ -f "../backend/render.yaml" ]; then
+    RENDER_YAML="../backend/render.yaml"
+    DOCKERFILE_PATH="../backend/Dockerfile"
+elif [ -f "render.yaml" ]; then
+    RENDER_YAML="render.yaml"
+    DOCKERFILE_PATH="Dockerfile"
+fi
 
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -74,15 +87,18 @@ log_success "Prerequisites validated"
 # Step 2: Validate Docker configuration
 log_step "2/8: Validating Docker configuration..."
 
-if [ -f "Dockerfile" ]; then
-    log_info "Dockerfile found"
+if [ -f "$DOCKERFILE_PATH" ]; then
+    log_info "Dockerfile found at: $DOCKERFILE_PATH"
     
     # Check if Docker is running
     if docker info &> /dev/null; then
         log_info "Docker is running - testing build..."
         
-        # Test Docker build
-        if docker build -t marketedge-render-test . --progress=plain 2>&1 | tail -5; then
+        # Get the directory containing the Dockerfile
+        DOCKER_CONTEXT=$(dirname "$DOCKERFILE_PATH")
+        
+        # Test Docker build from the correct context
+        if docker build -t marketedge-render-test "$DOCKER_CONTEXT" --progress=plain 2>&1 | tail -5; then
             log_success "Docker build test successful"
         else
             log_warning "Docker build test failed - continuing anyway"
@@ -91,7 +107,7 @@ if [ -f "Dockerfile" ]; then
         log_warning "Docker not running - skipping build test"
     fi
 else
-    log_error "Dockerfile not found"
+    log_error "Dockerfile not found at: $DOCKERFILE_PATH"
     exit 1
 fi
 
