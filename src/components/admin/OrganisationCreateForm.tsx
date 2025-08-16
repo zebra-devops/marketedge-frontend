@@ -5,6 +5,7 @@ import { OrganisationCreate, IndustryOption } from '@/types/api'
 import { Button } from '@/components/ui/Button'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
 import { apiService } from '@/services/api'
+import { CheckIcon } from '@heroicons/react/24/outline'
 
 interface OrganisationCreateFormProps {
   onSuccess?: (organisation: any) => void
@@ -12,7 +13,7 @@ interface OrganisationCreateFormProps {
 }
 
 export function OrganisationCreateForm({ onSuccess, onCancel }: OrganisationCreateFormProps) {
-  const [formData, setFormData] = useState<OrganisationCreate>({
+  const [formData, setFormData] = useState<OrganisationCreate & { applications: string[] }>({
     name: '',
     industry_type: '',
     subscription_plan: 'basic',
@@ -20,6 +21,7 @@ export function OrganisationCreateForm({ onSuccess, onCancel }: OrganisationCrea
     admin_email: '',
     admin_first_name: '',
     admin_last_name: '',
+    applications: ['market_edge'], // Default to Market Edge
   })
 
   const [industries, setIndustries] = useState<IndustryOption[]>([])
@@ -27,6 +29,31 @@ export function OrganisationCreateForm({ onSuccess, onCancel }: OrganisationCrea
   const [loadingIndustries, setLoadingIndustries] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
+  // Applications configuration
+  const applications = [
+    {
+      id: 'market_edge',
+      name: 'Market Edge',
+      description: 'Competitive Intelligence & Market Analysis',
+      color: 'from-blue-500 to-green-500',
+      defaultForIndustries: ['cinema_exhibition', 'accommodation', 'fitness', 'retail_trade', 'business_services']
+    },
+    {
+      id: 'causal_edge',
+      name: 'Causal Edge',
+      description: 'Business Process & Causal Analysis',
+      color: 'from-orange-500 to-red-500',
+      defaultForIndustries: ['cinema_exhibition', 'accommodation', 'business_services']
+    },
+    {
+      id: 'value_edge',
+      name: 'Value Edge',
+      description: 'Value Engineering & ROI Analysis',
+      color: 'from-purple-500 to-teal-500',
+      defaultForIndustries: ['cinema_exhibition', 'accommodation', 'business_services']
+    }
+  ]
 
   // SIC codes for different industries (focusing on cinema for Odeon demo)
   const sicCodes: Record<string, { code: string; description: string }[]> = {
@@ -76,7 +103,7 @@ export function OrganisationCreateForm({ onSuccess, onCancel }: OrganisationCrea
     }
   }
 
-  const handleInputChange = (field: keyof OrganisationCreate, value: string) => {
+  const handleInputChange = (field: keyof (OrganisationCreate & { applications: string[] }), value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     
     // Clear validation error when user starts typing
@@ -84,9 +111,28 @@ export function OrganisationCreateForm({ onSuccess, onCancel }: OrganisationCrea
       setValidationErrors(prev => ({ ...prev, [field]: '' }))
     }
 
-    // Auto-select SIC code for cinema (Odeon demo)
-    if (field === 'industry_type' && value === 'cinema') {
-      setFormData(prev => ({ ...prev, sic_code: '59140' }))
+    // Auto-select applications and SIC code based on industry
+    if (field === 'industry_type') {
+      // Auto-select SIC code for cinema (Odeon demo)
+      if (value === 'cinema_exhibition') {
+        setFormData(prev => ({ ...prev, sic_code: '59140' }))
+      }
+      
+      // Auto-select recommended applications for this industry
+      const recommendedApps = applications
+        .filter(app => app.defaultForIndustries.includes(value))
+        .map(app => app.id)
+      
+      setFormData(prev => ({ ...prev, applications: recommendedApps }))
+    }
+  }
+
+  const handleApplicationToggle = (appId: string) => {
+    const currentApps = formData.applications || []
+    if (currentApps.includes(appId)) {
+      setFormData(prev => ({ ...prev, applications: currentApps.filter(id => id !== appId) }))
+    } else {
+      setFormData(prev => ({ ...prev, applications: [...currentApps, appId] }))
     }
   }
 
@@ -113,6 +159,10 @@ export function OrganisationCreateForm({ onSuccess, onCancel }: OrganisationCrea
 
     if (!formData.admin_last_name.trim()) {
       errors.admin_last_name = 'Admin last name is required'
+    }
+
+    if (!formData.applications || formData.applications.length === 0) {
+      errors.applications = 'At least one application must be selected'
     }
 
     setValidationErrors(errors)
@@ -316,6 +366,56 @@ export function OrganisationCreateForm({ onSuccess, onCancel }: OrganisationCrea
               )}
             </div>
           </div>
+        </div>
+
+        {/* Application Selection */}
+        <div className="mt-8 border-t border-gray-200 pt-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Application Access</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Select which applications this organization will have access to:
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {applications.map((app) => {
+              const isSelected = formData.applications?.includes(app.id) || false
+              const isRecommended = formData.industry_type && app.defaultForIndustries.includes(formData.industry_type)
+              
+              return (
+                <div
+                  key={app.id}
+                  className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                    isSelected
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => handleApplicationToggle(app.id)}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${app.color} flex items-center justify-center flex-shrink-0`}>
+                      <CheckIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <h5 className="font-medium text-gray-900">{app.name}</h5>
+                    {isSelected && (
+                      <div className="ml-auto">
+                        <CheckIcon className="h-5 w-5 text-blue-600" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">{app.description}</p>
+                  
+                  {isRecommended && (
+                    <span className="absolute top-2 right-2 bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">
+                      Recommended
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          
+          {validationErrors.applications && (
+            <p className="text-sm text-red-600 mt-2">{validationErrors.applications}</p>
+          )}
         </div>
 
         <div className="mt-8 flex justify-end space-x-3">

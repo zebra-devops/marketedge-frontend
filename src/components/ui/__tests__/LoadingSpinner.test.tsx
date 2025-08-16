@@ -6,7 +6,7 @@ describe('LoadingSpinner Component', () => {
   it('renders with default props', () => {
     render(<LoadingSpinner />)
     
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     expect(container).toBeInTheDocument()
     expect(container).toHaveClass('flex', 'justify-center', 'items-center')
     
@@ -17,7 +17,7 @@ describe('LoadingSpinner Component', () => {
   it('renders with medium size by default', () => {
     render(<LoadingSpinner />)
     
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     const spinner = container.firstChild
     expect(spinner).toHaveClass('h-8', 'w-8')
   })
@@ -25,7 +25,7 @@ describe('LoadingSpinner Component', () => {
   it('renders with small size', () => {
     render(<LoadingSpinner size="sm" />)
     
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     const spinner = container.firstChild
     expect(spinner).toHaveClass('h-4', 'w-4')
   })
@@ -33,7 +33,7 @@ describe('LoadingSpinner Component', () => {
   it('renders with large size', () => {
     render(<LoadingSpinner size="lg" />)
     
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     const spinner = container.firstChild
     expect(spinner).toHaveClass('h-12', 'w-12')
   })
@@ -41,14 +41,14 @@ describe('LoadingSpinner Component', () => {
   it('applies custom className', () => {
     render(<LoadingSpinner className="custom-spinner" />)
     
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     expect(container).toHaveClass('custom-spinner')
   })
 
   it('has proper spinner styling', () => {
     render(<LoadingSpinner />)
     
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     const spinner = container.firstChild
     
     expect(spinner).toHaveClass(
@@ -79,7 +79,7 @@ describe('LoadingSpinner Component', () => {
   it('combines custom className with default classes', () => {
     render(<LoadingSpinner className="my-4 text-red-500" />)
     
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     expect(container).toHaveClass('flex', 'justify-center', 'items-center', 'my-4', 'text-red-500')
   })
 
@@ -88,7 +88,7 @@ describe('LoadingSpinner Component', () => {
     
     // While not explicitly tested, the component structure supports
     // adding aria-label or role attributes if needed for accessibility
-    const container = screen.getByRole('generic')
+    const container = screen.getByTestId('loading-spinner')
     expect(container).toBeInTheDocument()
   })
 
@@ -101,7 +101,7 @@ describe('LoadingSpinner Component', () => {
       </div>
     )
     
-    const spinners = screen.getAllByRole('generic')
+    const spinners = screen.getAllByTestId('loading-spinner')
     expect(spinners).toHaveLength(3)
     
     spinners.forEach(spinner => {

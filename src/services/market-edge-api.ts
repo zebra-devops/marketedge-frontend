@@ -10,11 +10,24 @@ import {
   MarketTrends,
   MarketReport
 } from '@/types/market-edge';
+import { cinemaDemoData } from './cinema-demo-data';
 import Cookies from 'js-cookie';
 
 const API_BASE = 'http://localhost:8000/api/v1/market-edge';
 
 class MarketEdgeAPI {
+  private isDemoMode: boolean = false;
+
+  // Enable/disable demo mode for cinema presentation
+  setDemoMode(enabled: boolean) {
+    this.isDemoMode = enabled;
+    console.log(`Market Edge API Demo Mode: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+  }
+
+  getDemoMode(): boolean {
+    return this.isDemoMode;
+  }
+
   private async request<T>(
     endpoint: string, 
     options: RequestInit = {}
@@ -47,6 +60,11 @@ class MarketEdgeAPI {
 
   // Market endpoints
   async getMarkets(): Promise<Market[]> {
+    if (this.isDemoMode) {
+      // Return cinema demo markets with slight delay for realism
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return cinemaDemoData.getMarkets();
+    }
     return this.request<Market[]>('/markets');
   }
 
@@ -166,6 +184,11 @@ class MarketEdgeAPI {
 
   // Analysis endpoints
   async getMarketOverview(marketId: string): Promise<MarketOverview> {
+    if (this.isDemoMode) {
+      // Return cinema demo market overview with delay for realism
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return cinemaDemoData.getMarketOverview();
+    }
     return this.request<MarketOverview>(`/markets/${marketId}/overview`);
   }
 
@@ -204,6 +227,12 @@ class MarketEdgeAPI {
       product_service?: string;
     } = {}
   ): Promise<CompetitorComparison> {
+    if (this.isDemoMode) {
+      // Return cinema competitor comparison with delay for realism
+      await new Promise(resolve => setTimeout(resolve, 400));
+      return cinemaDemoData.getCompetitorComparison();
+    }
+    
     const params = new URLSearchParams();
     if (options.competitor_ids) {
       params.append('competitor_ids', options.competitor_ids.join(','));
@@ -222,6 +251,12 @@ class MarketEdgeAPI {
       days_back?: number;
     } = {}
   ): Promise<MarketTrends> {
+    if (this.isDemoMode) {
+      // Return cinema pricing trends with delay for realism
+      await new Promise(resolve => setTimeout(resolve, 450));
+      return cinemaDemoData.getMarketTrends();
+    }
+    
     const params = new URLSearchParams();
     if (options.competitor_id) params.append('competitor_id', options.competitor_id);
     if (options.product_service) params.append('product_service', options.product_service);

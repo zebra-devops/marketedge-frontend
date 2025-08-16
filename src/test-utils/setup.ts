@@ -13,7 +13,7 @@ import React from 'react'
 import '@testing-library/jest-dom'
 import { configure } from '@testing-library/react'
 import { toHaveNoViolations } from 'jest-axe'
-import { server } from './mocks/server'
+import { server } from '../__tests__/mocks/server'
 
 // Extend Jest matchers
 expect.extend(toHaveNoViolations)
@@ -240,13 +240,12 @@ afterAll(() => {
 // Global test timeout for async operations
 jest.setTimeout(10000)
 
-// Enable fake timers by default for better test control
-// Individual tests can opt-out using jest.useRealTimers()
+// Use real timers by default to avoid performance issues
+// Individual tests can opt-in using jest.useFakeTimers() if needed
 beforeEach(() => {
-  jest.useFakeTimers()
+  jest.useRealTimers()
 })
 
 afterEach(() => {
-  jest.runOnlyPendingTimers()
   jest.useRealTimers()
 })

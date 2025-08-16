@@ -47,6 +47,46 @@ export class AuthService {
   private readonly tokenRefreshThreshold = 5 * 60 * 1000 // 5 minutes in milliseconds
   private processedAuthCodes: Set<string> = new Set()
 
+  /**
+   * Emergency authentication method using form data to bypass CORS preflight
+   * This method uses application/x-www-form-urlencoded instead of application/json
+   * to avoid triggering browser preflight requests
+   */
+  private async emergencyAuthLogin(loginData: LoginRequest & { state?: string }): Promise<EnhancedTokenResponse> {
+    console.log('EMERGENCY CORS FIX: Making authentication request with form data')
+    
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+    const authUrl = `${baseUrl}/api/v1/auth/login`
+    
+    // Create form data to avoid preflight request
+    const formData = new URLSearchParams()
+    formData.append('code', loginData.code)
+    formData.append('redirect_uri', loginData.redirect_uri)
+    if (loginData.state) {
+      formData.append('state', loginData.state)
+    }
+    
+    const response = await fetch(authUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        // Don't include Authorization header for login request
+      },
+      credentials: 'include', // Include cookies
+      body: formData
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('EMERGENCY AUTH LOGIN FAILED:', response.status, errorText)
+      throw new Error(`Authentication failed: ${response.status}`)
+    }
+    
+    const result = await response.json()
+    console.log('EMERGENCY AUTH LOGIN SUCCESS')
+    return result
+  }
+
   async login(loginData: LoginRequest & { state?: string }): Promise<EnhancedTokenResponse> {
     // EMERGENCY CIRCUIT BREAKER: Prevent duplicate requests with the same auth code
     if (this.processedAuthCodes.has(loginData.code)) {
@@ -68,7 +108,9 @@ export class AuthService {
     
     this.loginPromise = (async () => {
       try {
-        const response = await apiService.post<EnhancedTokenResponse>('/auth/login', loginData)
+        // EMERGENCY CORS FIX: Use form data to avoid preflight request
+        console.log('EMERGENCY CORS FIX: Using form data for authentication request')
+        const response = await this.emergencyAuthLogin(loginData)
         
         console.log('Login response received from backend')
         

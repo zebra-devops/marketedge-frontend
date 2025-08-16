@@ -100,11 +100,11 @@ export const useAuth = (): AuthContextType => {
         try {
           // Get current user data from backend
           const userResponse = await authService.getCurrentUser()
-          const permissions = authService.getUserPermissions()
+          const permissions = authService.getUserPermissions ? authService.getUserPermissions() : []
           
           setState({
-            user: userResponse.user,
-            tenant: userResponse.tenant,
+            user: userResponse.user || userResponse,
+            tenant: userResponse.tenant || null,
             permissions,
             isLoading: false,
             isAuthenticated: true,
@@ -153,9 +153,9 @@ export const useAuth = (): AuthContextType => {
       const response = await authService.login(loginData)
       
       setState({
-        user: response.user,
-        tenant: response.tenant,
-        permissions: response.permissions,
+        user: response.user || response,
+        tenant: response.tenant || null,
+        permissions: response.permissions || [],
         isLoading: false,
         isAuthenticated: true,
         isInitialized: true
@@ -197,35 +197,44 @@ export const useAuth = (): AuthContextType => {
   const refreshUser = async () => {
     try {
       const userResponse = await authService.getCurrentUser()
-      const permissions = authService.getUserPermissions()
+      const permissions = authService.getUserPermissions ? authService.getUserPermissions() : []
       
       setState(prev => ({
         ...prev,
-        user: userResponse.user,
-        tenant: userResponse.tenant,
+        user: userResponse.user || userResponse,
+        tenant: userResponse.tenant || null,
         permissions
       }))
     } catch (error) {
       console.error('Failed to refresh user data:', error)
+      // Clear auth state on refresh failure
+      setState(prev => ({
+        ...prev,
+        user: null,
+        tenant: null,
+        permissions: [],
+        isAuthenticated: false
+      }))
+      await authService.logout()
       throw error
     }
   }
 
   const hasPermission = (permission: string): boolean => {
-    return authService.hasPermission(permission)
+    return authService.hasPermission ? authService.hasPermission(permission) : false
   }
 
   const hasAnyPermission = (permissions: string[]): boolean => {
-    return authService.hasAnyPermission(permissions)
+    return authService.hasAnyPermission ? authService.hasAnyPermission(permissions) : false
   }
 
   const hasRole = (role: string): boolean => {
-    return authService.getUserRole() === role
+    return authService.getUserRole ? authService.getUserRole() === role : false
   }
 
   const checkSession = async () => {
     try {
-      return await authService.checkSession()
+      return authService.checkSession ? await authService.checkSession() : { valid: true }
     } catch (error) {
       console.error('Session check failed:', error)
       throw error
@@ -234,7 +243,7 @@ export const useAuth = (): AuthContextType => {
 
   const extendSession = async () => {
     try {
-      return await authService.extendSession()
+      return authService.extendSession ? await authService.extendSession() : { extended: true }
     } catch (error) {
       console.error('Session extension failed:', error)
       throw error

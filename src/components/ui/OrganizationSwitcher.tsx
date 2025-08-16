@@ -45,6 +45,7 @@ export default function OrganizationSwitcher({ className = '' }: OrganizationSwi
     switchOrganisation,
     isSwitching,
     isLoadingAccessible,
+    isSuperAdmin,
   } = useOrganisationContext()
 
   const [isOpen, setIsOpen] = useState(false)
@@ -62,7 +63,13 @@ export default function OrganizationSwitcher({ className = '' }: OrganizationSwi
   }
 
   // Don't show if user has access to only one organization or none
-  if (isLoadingAccessible || accessibleOrganisations.length <= 1) {
+  // Exception: Show for super admins even if they only have one org, as they can potentially access all
+  if (isLoadingAccessible || (accessibleOrganisations.length <= 1 && !isSuperAdmin)) {
+    return null
+  }
+
+  // For super admins, show even if only one org is loaded (they can access others)
+  if (isSuperAdmin && accessibleOrganisations.length === 0) {
     return null
   }
 
@@ -122,7 +129,16 @@ export default function OrganizationSwitcher({ className = '' }: OrganizationSwi
           >
             <Listbox.Options className="absolute z-50 mt-1 max-h-60 w-full min-w-[280px] overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
               <div className="px-3 py-2 text-xs font-medium text-gray-500 border-b border-gray-200">
-                Switch Organization
+                {isSuperAdmin ? (
+                  <div className="flex items-center justify-between">
+                    <span>Switch Organization</span>
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                      Super Admin
+                    </span>
+                  </div>
+                ) : (
+                  'Switch Organization'
+                )}
               </div>
               
               {accessibleOrganisations.map((organisation) => {

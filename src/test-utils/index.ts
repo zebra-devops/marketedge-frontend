@@ -572,3 +572,7 @@ export const resetTestEnvironment = () => {
 
 // Export default render as renderWithProviders for convenience
 export { renderWithProviders as render }
+
+// Re-export MSW utilities for testing
+export { server } from '../__tests__/mocks/server'
+export { mockHandlerUtils } from '../__tests__/mocks/handlers'

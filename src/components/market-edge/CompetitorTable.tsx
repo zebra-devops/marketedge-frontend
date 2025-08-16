@@ -18,6 +18,7 @@ interface CompetitorTableProps {
   onViewCompetitor?: (competitor: Competitor) => void;
   onEditCompetitor?: (competitor: Competitor) => void;
   className?: string;
+  isCinemaDemoMode?: boolean;
 }
 
 export const CompetitorTable: React.FC<CompetitorTableProps> = ({
@@ -25,7 +26,8 @@ export const CompetitorTable: React.FC<CompetitorTableProps> = ({
   isLoading = false,
   onViewCompetitor,
   onEditCompetitor,
-  className = ''
+  className = '',
+  isCinemaDemoMode = false
 }) => {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -115,6 +117,20 @@ export const CompetitorTable: React.FC<CompetitorTableProps> = ({
     return updatedDate.toLocaleDateString();
   };
 
+  const getCinemaLocationInfo = (competitor: Competitor) => {
+    if (!competitor.locations) return null;
+    
+    const locations = competitor.locations;
+    const totalSites = locations.total_sites || 0;
+    const totalScreens = locations.total_screens || 0;
+    
+    return {
+      sites: totalSites,
+      screens: totalScreens,
+      regions: locations.regions ? Object.keys(locations.regions).length : 0
+    };
+  };
+
   if (isLoading) {
     return (
       <div className={`bg-white rounded-lg border border-gray-200 ${className}`}>
@@ -152,20 +168,15 @@ export const CompetitorTable: React.FC<CompetitorTableProps> = ({
                 onClick={() => handleSort('name')}
               >
                 <div className="flex items-center space-x-1">
-                  <span>Competitor</span>
+                  <span>Cinema Chain</span>
                   <SortIcon field="name" />
                 </div>
               </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                onClick={() => handleSort('business_type')}
-              >
-                <div className="flex items-center space-x-1">
-                  <span>Type</span>
-                  <SortIcon field="business_type" />
-                </div>
-              </th>
+              {isCinemaDemoMode && (
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <span>Locations & Screens</span>
+                </th>
+              )}
               <th
                 scope="col"
                 className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -202,70 +213,108 @@ export const CompetitorTable: React.FC<CompetitorTableProps> = ({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {sortedCompetitors.map((competitor) => (
-              <tr key={competitor.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">
-                        {competitor.name}
+            {sortedCompetitors.map((competitor) => {
+              const cinemaInfo = getCinemaLocationInfo(competitor);
+              return (
+                <tr key={competitor.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {competitor.name}
+                        </div>
+                        {competitor.website && (
+                          <div className="text-sm text-gray-500 flex items-center mt-1">
+                            <GlobeAltIcon className="w-3 h-3 mr-1" />
+                            <a
+                              href={competitor.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="hover:text-blue-600 truncate max-w-40"
+                            >
+                              {competitor.website.replace(/^https?:\/\//, '')}
+                            </a>
+                          </div>
+                        )}
+                        {isCinemaDemoMode && competitor.description && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {competitor.description}
+                          </div>
+                        )}
                       </div>
-                      {competitor.website && (
-                        <div className="text-sm text-gray-500 flex items-center mt-1">
-                          <GlobeAltIcon className="w-3 h-3 mr-1" />
-                          <a
-                            href={competitor.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="hover:text-blue-600 truncate max-w-40"
-                          >
-                            {competitor.website.replace(/^https?:\/\//, '')}
-                          </a>
+                    </div>
+                  </td>
+                  {isCinemaDemoMode && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {cinemaInfo ? (
+                        <div className="text-sm">
+                          <div className="flex items-center space-x-4">
+                            <div>
+                              <span className="font-medium text-gray-900">{cinemaInfo.sites}</span>
+                              <span className="text-gray-500 text-xs ml-1">sites</span>
+                            </div>
+                            <div>
+                              <span className="font-medium text-gray-900">{cinemaInfo.screens}</span>
+                              <span className="text-gray-500 text-xs ml-1">screens</span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {cinemaInfo.regions} regions covered
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">No location data</span>
+                      )}
+                    </td>
+                  )}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatMarketShare(competitor.market_share_estimate)}
+                      </span>
+                      {isCinemaDemoMode && competitor.market_share_estimate && (
+                        <div className="ml-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full" 
+                              style={{ width: `${Math.min(competitor.market_share_estimate * 400, 100)}%` }}
+                            ></div>
+                          </div>
                         </div>
                       )}
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-sm text-gray-900">
-                    {competitor.business_type || 'Not specified'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="text-sm font-medium text-gray-900">
-                    {formatMarketShare(competitor.market_share_estimate)}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {getPriorityBadge(competitor.tracking_priority)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatLastUpdated(competitor.last_updated)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center space-x-2">
-                    {onViewCompetitor && (
-                      <button
-                        onClick={() => onViewCompetitor(competitor)}
-                        className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                        title="View Details"
-                      >
-                        <EyeIcon className="w-4 h-4" />
-                      </button>
-                    )}
-                    {onEditCompetitor && (
-                      <button
-                        onClick={() => onEditCompetitor(competitor)}
-                        className="text-gray-600 hover:text-gray-900 p-1 rounded"
-                        title="Edit Competitor"
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {getPriorityBadge(competitor.tracking_priority)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {formatLastUpdated(competitor.last_updated)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex items-center space-x-2">
+                      {onViewCompetitor && (
+                        <button
+                          onClick={() => onViewCompetitor(competitor)}
+                          className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                          title="View Details"
+                        >
+                          <EyeIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                      {onEditCompetitor && (
+                        <button
+                          onClick={() => onEditCompetitor(competitor)}
+                          className="text-gray-600 hover:text-gray-900 p-1 rounded"
+                          title="Edit Competitor"
+                        >
+                          <PencilIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

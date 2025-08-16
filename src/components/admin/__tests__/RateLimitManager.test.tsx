@@ -8,7 +8,7 @@
 import React from 'react'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { rest } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { axe, toHaveNoViolations } from 'jest-axe'
 
 import { RateLimitManager } from '../RateLimitManager'
@@ -133,8 +133,8 @@ describe('RateLimitManager', () => {
     it('displays error message when API fails', async () => {
       // Mock API error
       server.use(
-        rest.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
-          return res(ctx.status(500), ctx.json({ error: 'Internal server error' }))
+        http.get('/api/v1/admin/rate-limits', () => {
+          return HttpResponse.json({ error: 'Internal server error' }, { status: 500 })
         })
       )
 
@@ -153,12 +153,12 @@ describe('RateLimitManager', () => {
       // First call fails, second succeeds
       let callCount = 0
       server.use(
-        rest.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
+        http.get('/api/v1/admin/rate-limits', () => {
           callCount++
           if (callCount === 1) {
-            return res(ctx.status(500), ctx.json({ error: 'Server error' }))
+            return HttpResponse.json({ error: 'Server error' }, { status: 500 })
           }
-          return res(ctx.status(200), ctx.json([]))
+          return HttpResponse.json([])
         })
       )
 
@@ -229,9 +229,9 @@ describe('RateLimitManager', () => {
     it('submits update request when form is valid', async () => {
       let updateCalled = false
       server.use(
-        rest.put('/api/v1/admin/rate-limits/org-1', (req, res, ctx) => {
+        http.put('/api/v1/admin/rate-limits/org-1', () => {
           updateCalled = true
-          return res(ctx.status(200), ctx.json({
+          return HttpResponse.json({
             id: 'rate-limit-org-1',
             tenant_id: 'org-1',
             tenant_name: 'Hotel Chain A',
@@ -242,7 +242,7 @@ describe('RateLimitManager', () => {
             emergency_bypass: false,
             created_at: '2025-01-08T10:00:00Z',
             updated_at: new Date().toISOString()
-          }))
+          })
         })
       )
 
@@ -292,7 +292,7 @@ describe('RateLimitManager', () => {
       const onUpdate = jest.fn()
       
       server.use(
-        rest.put('/api/v1/admin/rate-limits/org-1', (req, res, ctx) => {
+        http.put('/api/v1/admin/rate-limits/org-1', (req, res, ctx) => {
           return res(ctx.status(200), ctx.json({
             id: 'rate-limit-org-1',
             tenant_id: 'org-1',
@@ -378,7 +378,7 @@ describe('RateLimitManager', () => {
       
       // Override the handler to show emergency bypass
       server.use(
-        rest.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
+        http.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
           return res(ctx.status(200), ctx.json([{
             id: 'rate-limit-org-bypass',
             tenant_id: 'org-bypass',
@@ -411,7 +411,7 @@ describe('RateLimitManager', () => {
       
       // Setup bypassed organization
       server.use(
-        rest.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
+        http.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
           return res(ctx.status(200), ctx.json([{
             id: 'rate-limit-org-1',
             tenant_id: 'org-1',
@@ -424,7 +424,7 @@ describe('RateLimitManager', () => {
             bypass_reason: 'Emergency maintenance'
           }]))
         }),
-        rest.delete('/api/v1/admin/rate-limits/org-1/emergency-bypass', (req, res, ctx) => {
+        http.delete('/api/v1/admin/rate-limits/org-1/emergency-bypass', (req, res, ctx) => {
           removeCalled = true
           return res(ctx.status(200), ctx.json({ message: 'Emergency bypass removed successfully' }))
         })
@@ -532,7 +532,7 @@ describe('RateLimitManager', () => {
 
     it('announces errors with proper ARIA live region', async () => {
       server.use(
-        rest.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
+        http.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
           return res(ctx.status(500), ctx.json({ error: 'Server error' }))
         })
       )
@@ -614,7 +614,7 @@ describe('RateLimitManager', () => {
     it('refreshes data when refresh button clicked', async () => {
       let callCount = 0
       server.use(
-        rest.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
+        http.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
           callCount++
           return res(ctx.status(200), ctx.json([]))
         })
@@ -641,7 +641,7 @@ describe('RateLimitManager', () => {
 
     it('shows empty state when no rate limits exist', async () => {
       server.use(
-        rest.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
+        http.get('/api/v1/admin/rate-limits', (req, res, ctx) => {
           return res(ctx.status(200), ctx.json([]))
         })
       )

@@ -342,3 +342,7 @@ export const mockApiResponse = {
 // Re-export testing library utilities
 export * from '@testing-library/react'
 export { default as userEvent } from '@testing-library/user-event'
+
+// Re-export MSW utilities
+export { server } from '../mocks/server'
+export { mockHandlerUtils } from '../mocks/handlers'

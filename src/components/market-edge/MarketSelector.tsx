@@ -21,25 +21,56 @@ export const MarketSelector: React.FC<MarketSelectorProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     loadMarkets();
   }, []);
 
-  const loadMarkets = async () => {
+  const loadMarkets = async (showLoading = true) => {
     try {
-      setIsLoading(true);
+      if (showLoading) {
+        setIsLoading(true);
+      }
+      console.log('Loading markets...');
       const marketData = await marketEdgeAPI.getMarkets();
-      setMarkets(marketData);
+      setMarkets(marketData || []);
       setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load markets');
+      setRetryCount(0); // Reset retry count on success
+      console.log('Markets loaded successfully:', marketData?.length || 0);
+    } catch (err: any) {
+      console.error('Failed to load markets:', err);
+      
+      // Enhanced error handling with specific messages
+      let errorMessage = 'Failed to load markets. Please try again.';
+      
+      if (err?.response?.status === 401) {
+        errorMessage = 'Authentication required. Please log in to access markets.';
+      } else if (err?.response?.status === 403) {
+        errorMessage = 'Access denied. You may not have permission to view markets.';
+      } else if (err?.response?.status === 404) {
+        errorMessage = 'Markets service not found. Please contact support.';
+      } else if (err?.response?.status >= 500) {
+        errorMessage = 'Server error occurred. Please try again in a moment.';
+      } else if (err?.message?.includes('Network Error')) {
+        errorMessage = 'Network connection error. Please check your connection.';
+      } else if (err?.message?.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (err?.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+      setMarkets([]); // Ensure markets is always an array
+      setRetryCount(prev => prev + 1);
     } finally {
-      setIsLoading(false);
+      if (showLoading) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const filteredMarkets = markets.filter(market =>
+  const filteredMarkets = (markets || []).filter(market =>
     market.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -87,13 +118,24 @@ export const MarketSelector: React.FC<MarketSelectorProps> = ({
           <div className="max-h-60 overflow-y-auto">
             {error ? (
               <div className="p-4 text-center text-red-600 text-sm">
-                {error}
+                <div className="mb-2">{error}</div>
+                {retryCount > 0 && (
+                  <div className="text-xs text-gray-500 mb-2">
+                    Retry attempt: {retryCount}
+                  </div>
+                )}
                 <button
-                  onClick={loadMarkets}
-                  className="block mx-auto mt-2 text-blue-600 hover:text-blue-800 underline"
+                  onClick={() => loadMarkets()}
+                  disabled={isLoading}
+                  className="block mx-auto mt-2 text-blue-600 hover:text-blue-800 underline disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Retry
+                  {isLoading ? 'Retrying...' : 'Try Again'}
                 </button>
+                {retryCount >= 3 && (
+                  <div className="mt-2 text-xs text-gray-500">
+                    Having trouble? Try refreshing the page or contact support.
+                  </div>
+                )}
               </div>
             ) : isLoading ? (
               <div className="p-4 text-center text-gray-500 text-sm">

@@ -7,7 +7,7 @@
 import React from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { rest } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { server } from '../../../__tests__/mocks/server'
 import { mockHandlerUtils } from '../../../__tests__/mocks/handlers'
 import { 
@@ -26,30 +26,80 @@ describe('PerformanceMetrics Component', () => {
   })
 
   describe('Basic Rendering', () => {
-    it('renders loading state initially', () => {
-      renderWithProviders(<PerformanceMetrics />)
+    it('renders loading state when isLoading is true', () => {
+      renderWithProviders(<PerformanceMetrics isLoading={true} />)
       
-      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument()
-      expect(screen.getByText(/loading performance metrics/i)).toBeInTheDocument()
+      // Check for loading skeleton cards
+      expect(screen.getAllByText('', { selector: 'div' })).toHaveLength(expect.any(Number))
+      const skeletonCards = document.querySelectorAll('.animate-pulse')
+      expect(skeletonCards.length).toBeGreaterThan(0)
     })
 
-    it('displays performance metrics after loading', async () => {
+    it('displays empty state when no metrics provided', () => {
       renderWithProviders(<PerformanceMetrics />)
       
-      await waitForLoadingToFinish()
+      expect(screen.getByText(/no metrics available/i)).toBeInTheDocument()
+      expect(screen.getByText(/metrics will appear here once pricing data is analyzed/i)).toBeInTheDocument()
+    })
+
+    it('displays performance metrics when data is provided', () => {
+      const mockMetrics = {
+        period_start: '2025-01-01T00:00:00Z',
+        period_end: '2025-01-14T23:59:59Z',
+        total_data_points: 150,
+        average_price: 125.50,
+        median_price: 120.00,
+        min_price: 85.00,
+        max_price: 200.00,
+        price_range: 115.00,
+        standard_deviation: 25.75,
+        price_quartiles: {
+          q1: 100.00,
+          q2: 120.00,
+          q3: 145.00
+        },
+        competitors: {
+          'comp-1': {
+            name: 'Competitor A',
+            average_price: 130.00,
+            median_price: 125.00,
+            min_price: 110.00,
+            max_price: 160.00,
+            price_points_count: 50,
+            standard_deviation: 15.50,
+            price_rank: 1,
+            position: 'high' as const
+          }
+        },
+        trends: {
+          trend: 'increasing' as const,
+          weekly_averages: {
+            '2025-01-01': 120.00,
+            '2025-01-08': 125.50
+          },
+          price_change: 5.50,
+          price_change_percent: 4.6
+        },
+        anomalies: []
+      }
+
+      renderWithProviders(<PerformanceMetrics metrics={mockMetrics} />)
       
-      expect(screen.getByText(/market performance/i)).toBeInTheDocument()
-      expect(screen.getByText(/revenue growth/i)).toBeInTheDocument()
-      expect(screen.getByText(/competitor analysis/i)).toBeInTheDocument()
+      // Check that metrics are displayed
+      expect(screen.getByText('£125.50')).toBeInTheDocument() // average price
+      expect(screen.getByText('Median: £120.00')).toBeInTheDocument() // median price
+      expect(screen.getByText('£85.00 - £200.00')).toBeInTheDocument() // min-max range
+      expect(screen.getByText('£115.00')).toBeInTheDocument() // price range value
+      expect(screen.getByText('1')).toBeInTheDocument() // competitor count
     })
 
     it('handles API errors gracefully', async () => {
       // Mock API error
       server.use(
-        rest.get('*/api/v1/market-edge/dashboard', (req, res, ctx) => {
-          return res(
-            ctx.status(500),
-            ctx.json({ error: 'Internal Server Error' })
+        http.get('*/api/v1/market-edge/dashboard', () => {
+          return HttpResponse.json(
+            { error: 'Internal Server Error' },
+            { status: 500 }
           )
         })
       )
@@ -237,17 +287,18 @@ describe('PerformanceMetrics Component', () => {
   describe('Rate Limiting Integration', () => {
     it('handles rate limit errors appropriately', async () => {
       server.use(
-        rest.get('*/api/v1/market-edge/dashboard', (req, res, ctx) => {
-          return res(
-            ctx.status(429),
-            ctx.json({
-              error: 'Rate limit exceeded',
-              message: 'Too many requests. Please try again later.',
-            }),
-            ctx.set('X-RateLimit-Limit', '5000'),
-            ctx.set('X-RateLimit-Remaining', '0'),
-            ctx.set('X-RateLimit-Reset', String(Date.now() + 3600))
-          )
+        http.get('*/api/v1/market-edge/dashboard', () => {
+          return HttpResponse.json({
+            error: 'Rate limit exceeded',
+            message: 'Too many requests. Please try again later.',
+          }, {
+            status: 429,
+            headers: {
+              'X-RateLimit-Limit': '5000',
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(Date.now() + 3600)
+            }
+          })
         })
       )
 

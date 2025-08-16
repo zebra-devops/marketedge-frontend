@@ -17,6 +17,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import Button from '@/components/ui/Button'
 import OrganizationSwitcher from '@/components/ui/OrganizationSwitcher'
+import ApplicationSwitcher from '@/components/ui/ApplicationSwitcher'
 
 interface NavigationItem {
   name: string
@@ -30,7 +31,6 @@ interface NavigationItem {
 const getNavigationItems = (userRole: string, permissions: string[], tenantInfo: any): NavigationItem[] => {
   const baseItems: NavigationItem[] = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Market Edge', href: '/market-edge', icon: ChartBarIcon, requiredPermissions: ['read:market_edge'] },
   ]
 
   // Add tenant-specific items
@@ -292,6 +292,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
             <div className="flex flex-1 items-center justify-end gap-x-4">
+              {/* Application Switcher */}
+              <ApplicationSwitcher userPermissions={permissions || []} />
               {/* Organization Switcher */}
               <OrganizationSwitcher />
             </div>

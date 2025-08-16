@@ -204,20 +204,6 @@ export const handlers = [
     })
   }),
 
-  http.get(`${API_BASE_URL}/api/v1/admin/rate-limits`, () => {
-    const rateLimits = Object.values(mockOrganizations).map(org => ({
-      organization_id: org.id,
-      organization_name: org.name,
-      subscription_plan: org.subscription_plan,
-      rate_limit_per_hour: org.rate_limit_per_hour,
-      burst_limit: org.burst_limit,
-      rate_limit_enabled: org.rate_limit_enabled,
-      industry: org.industry,
-      sic_code: org.sic_code
-    }))
-    
-    return HttpResponse.json({ rate_limits: rateLimits })
-  }),
 
   http.put(`${API_BASE_URL}/api/v1/admin/rate-limits/:orgId`, ({ params }) => {
     const { orgId } = params
@@ -536,6 +522,69 @@ export const handlers = [
   // Health check
   http.get(`${API_BASE_URL}/health`, () => {
     return HttpResponse.json({ status: 'healthy', version: '1.0.0' })
+  }),
+
+  // Relative path handlers for frontend API calls
+  http.get('/api/v1/admin/rate-limits', () => {
+    const rateLimits = Object.values(mockOrganizations).map(org => ({
+      id: `rate-limit-${org.id}`,
+      tenant_id: org.id,
+      tenant_name: org.name,
+      tier: org.subscription_plan === 'basic' ? 'standard' : 
+            org.subscription_plan === 'professional' ? 'premium' : 'enterprise',
+      requests_per_hour: org.rate_limit_per_hour,
+      burst_size: org.burst_limit,
+      enabled: org.rate_limit_enabled,
+      emergency_bypass: false,
+      created_at: '2025-01-08T10:00:00Z',
+      updated_at: '2025-01-08T10:00:00Z'
+    }))
+    
+    return HttpResponse.json(rateLimits)
+  }),
+
+  http.put('/api/v1/admin/rate-limits/:tenantId', ({ params }) => {
+    const { tenantId } = params
+    const org = getOrCreateMockOrganization(tenantId as string)
+    
+    return HttpResponse.json({
+      id: `rate-limit-${tenantId}`,
+      tenant_id: tenantId,
+      tenant_name: org.name,
+      tier: 'premium',
+      requests_per_hour: 5000,
+      burst_size: 250,
+      enabled: true,
+      emergency_bypass: false,
+      created_at: '2025-01-08T10:00:00Z',
+      updated_at: new Date().toISOString()
+    })
+  }),
+
+  http.post('/api/v1/admin/rate-limits/:tenantId/emergency-bypass', ({ params }) => {
+    const { tenantId } = params
+    const org = getOrCreateMockOrganization(tenantId as string)
+    
+    return HttpResponse.json({
+      id: `rate-limit-${tenantId}`,
+      tenant_id: tenantId,
+      tenant_name: org.name,
+      tier: 'standard',
+      requests_per_hour: org.rate_limit_per_hour,
+      burst_size: org.burst_limit,
+      enabled: true,
+      emergency_bypass: true,
+      bypass_reason: 'Emergency bypass requested for testing',
+      bypass_until: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
+      created_at: '2025-01-08T10:00:00Z',
+      updated_at: new Date().toISOString()
+    })
+  }),
+
+  http.delete('/api/v1/admin/rate-limits/:tenantId/emergency-bypass', () => {
+    return HttpResponse.json({
+      message: 'Emergency bypass removed successfully'
+    })
   }),
 ]
 

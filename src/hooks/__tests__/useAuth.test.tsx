@@ -10,6 +10,14 @@ jest.mock('@/services/auth', () => ({
     getCurrentUser: jest.fn(),
     login: jest.fn(),
     logout: jest.fn(),
+    getUserPermissions: jest.fn().mockReturnValue([]),
+    hasPermission: jest.fn(),
+    hasAnyPermission: jest.fn(),
+    getUserRole: jest.fn(),
+    checkSession: jest.fn(),
+    extendSession: jest.fn(),
+    initializeAutoRefresh: jest.fn(),
+    initializeActivityTracking: jest.fn(),
   },
 }))
 
@@ -100,7 +108,10 @@ describe('useAuth Hook', () => {
     })
     
     await act(async () => {
-      await result.current.login('auth-code', 'http://localhost:3000/callback')
+      await result.current.login({
+        code: 'auth-code', 
+        redirect_uri: 'http://localhost:3000/callback'
+      })
     })
     
     expect(result.current.user).toEqual(mockUser)
@@ -124,7 +135,10 @@ describe('useAuth Hook', () => {
     
     await expect(
       act(async () => {
-        await result.current.login('invalid-code', 'http://localhost:3000/callback')
+        await result.current.login({
+          code: 'invalid-code', 
+          redirect_uri: 'http://localhost:3000/callback'
+        })
       })
     ).rejects.toThrow('Login failed')
     

@@ -19,8 +19,11 @@ import { AuditLogViewer } from '@/components/admin/AuditLogViewer';
 import { AdminStats } from '@/components/admin/AdminStats';
 import { SecurityEvents } from '@/components/admin/SecurityEvents';
 import { OrganisationManager } from '@/components/admin/OrganisationManager';
+import SuperAdminUserProvisioning from '@/components/admin/SuperAdminUserProvisioning';
+import OrganizationUserManagement from '@/components/admin/OrganizationUserManagement';
+import ApplicationAccessMatrix from '@/components/admin/ApplicationAccessMatrix';
 
-type TabType = 'dashboard' | 'organisations' | 'feature-flags' | 'modules' | 'audit-logs' | 'security';
+type TabType = 'dashboard' | 'organisations' | 'user-provisioning' | 'user-management' | 'access-matrix' | 'feature-flags' | 'modules' | 'audit-logs' | 'security';
 
 export default function AdminPage() {
   const { user } = useAuthContext();
@@ -59,6 +62,24 @@ export default function AdminPage() {
       name: 'Organisations', 
       icon: BuildingOffice2Icon,
       description: 'Create and manage organisations'
+    },
+    { 
+      id: 'user-provisioning', 
+      name: 'User Provisioning', 
+      icon: UsersIcon,
+      description: 'Create users across organizations'
+    },
+    { 
+      id: 'user-management', 
+      name: 'User Management', 
+      icon: UsersIcon,
+      description: 'Manage organization users'
+    },
+    { 
+      id: 'access-matrix', 
+      name: 'Access Matrix', 
+      icon: CogIcon,
+      description: 'Application access permissions'
     },
     { 
       id: 'feature-flags', 
@@ -146,6 +167,9 @@ export default function AdminPage() {
           <div className="flex-1 min-w-0">
             {activeTab === 'dashboard' && <AdminStats />}
             {activeTab === 'organisations' && <OrganisationManager />}
+            {activeTab === 'user-provisioning' && <SuperAdminUserProvisioning />}
+            {activeTab === 'user-management' && <OrganizationUserManagement />}
+            {activeTab === 'access-matrix' && <ApplicationAccessMatrix />}
             {activeTab === 'feature-flags' && <FeatureFlagManager />}
             {activeTab === 'modules' && <ModuleManager />}
             {activeTab === 'audit-logs' && <AuditLogViewer />}
