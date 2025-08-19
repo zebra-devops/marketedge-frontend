@@ -31,15 +31,17 @@ class ApiService {
   private setupInterceptors() {
     this.client.interceptors.request.use(
       (config) => {
-        const token = Cookies.get('access_token')
+        // Try cookies first, then localStorage fallback
+        let token = Cookies.get('access_token')
+        if (!token) {
+          token = localStorage.getItem('access_token')
+        }
         
-        // PRODUCTION DEBUG: Log token status for troubleshooting
-        if (process.env.NODE_ENV === 'production') {
-          console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)
-          console.log(`Token available: ${token ? 'YES' : 'NO'}`)
-          if (!token) {
-            console.log('❌ No access token - request will fail with 403/401')
-          }
+        // DEBUG: Log token status for troubleshooting (development and production)
+        console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)
+        console.log(`Token available: ${token ? 'YES' : 'NO'}`)
+        if (!token) {
+          console.log('❌ No access token - request will fail with 403/401')
         }
         
         if (token) {
@@ -85,7 +87,12 @@ class ApiService {
           originalRequest._retry = true
 
           try {
-            const refreshToken = Cookies.get('refresh_token')
+            // Try cookies first, then localStorage fallback for refresh token
+            let refreshToken = Cookies.get('refresh_token')
+            if (!refreshToken) {
+              refreshToken = localStorage.getItem('refresh_token')
+            }
+            
             if (refreshToken) {
               const response = await this.refreshToken({ refresh_token: refreshToken })
               Cookies.set('access_token', response.access_token)
@@ -121,6 +128,8 @@ class ApiService {
   private clearTokens() {
     Cookies.remove('access_token')
     Cookies.remove('refresh_token')
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
   }
 
   async get<T>(url: string): Promise<T> {
@@ -169,6 +178,10 @@ class ApiService {
 
   async updateCurrentOrganisation(data: Partial<OrganisationCreate>): Promise<Organisation> {
     return this.put<Organisation>('/organisations/current', data)
+  }
+
+  async updateOrganisation(id: string, data: Partial<OrganisationCreate>): Promise<Organisation> {
+    return this.put<Organisation>(`/organisations/${id}`, data)
   }
 
   async getAvailableIndustries(): Promise<IndustryOption[]> {

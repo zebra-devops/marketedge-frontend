@@ -4,12 +4,16 @@ import { useState } from 'react'
 import { PlusIcon, BuildingOffice2Icon } from '@heroicons/react/24/outline'
 import { OrganisationsList } from './OrganisationsList'
 import { OrganisationCreateForm } from './OrganisationCreateForm'
+import { OrganisationEditForm } from './OrganisationEditForm'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { useOrganisationContext } from '@/components/providers/OrganisationProvider'
+import { Organisation } from '@/types/api'
 
 export function OrganisationManager() {
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [selectedOrganisation, setSelectedOrganisation] = useState<Organisation | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const { isSuperAdmin, allOrganisations, isLoadingAll } = useOrganisationContext()
 
@@ -23,6 +27,23 @@ export function OrganisationManager() {
 
   const handleCreateCancel = () => {
     setShowCreateForm(false)
+  }
+
+  const handleSelectOrganisation = (organisation: Organisation) => {
+    setSelectedOrganisation(organisation)
+    setShowEditForm(true)
+  }
+
+  const handleEditSuccess = (updatedOrganisation: Organisation) => {
+    setShowEditForm(false)
+    setSelectedOrganisation(null)
+    setRefreshTrigger(prev => prev + 1)
+    console.log('Organisation updated successfully:', updatedOrganisation)
+  }
+
+  const handleEditCancel = () => {
+    setShowEditForm(false)
+    setSelectedOrganisation(null)
   }
 
   if (!isSuperAdmin) {
@@ -55,9 +76,9 @@ export function OrganisationManager() {
           <Button
             onClick={() => setShowCreateForm(true)}
             variant="primary"
-            className="flex items-center"
+            className="flex items-center whitespace-nowrap px-3 py-2 text-sm font-medium"
           >
-            <PlusIcon className="h-5 w-5 mr-2" />
+            <PlusIcon className="h-4 w-4 mr-1.5" />
             Create Organisation
           </Button>
         </div>
@@ -91,6 +112,7 @@ export function OrganisationManager() {
       <OrganisationsList
         refreshTrigger={refreshTrigger}
         onCreateNew={() => setShowCreateForm(true)}
+        onSelectOrganisation={handleSelectOrganisation}
       />
 
       {/* Create Organisation Modal */}
@@ -98,12 +120,28 @@ export function OrganisationManager() {
         isOpen={showCreateForm}
         onClose={handleCreateCancel}
         title="Create New Organisation"
-        size="xl"
+        size="5xl"
       >
         <OrganisationCreateForm
           onSuccess={handleCreateSuccess}
           onCancel={handleCreateCancel}
         />
+      </Modal>
+
+      {/* Edit Organisation Modal */}
+      <Modal
+        isOpen={showEditForm}
+        onClose={handleEditCancel}
+        title={`Edit Organisation: ${selectedOrganisation?.name || ''}`}
+        size="4xl"
+      >
+        {selectedOrganisation && (
+          <OrganisationEditForm
+            organisation={selectedOrganisation}
+            onSuccess={handleEditSuccess}
+            onCancel={handleEditCancel}
+          />
+        )}
       </Modal>
     </div>
   )

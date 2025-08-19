@@ -9,9 +9,10 @@ import { useOrganisationContext } from '@/components/providers/OrganisationProvi
 interface OrganisationsListProps {
   onCreateNew?: () => void
   refreshTrigger?: number
+  onSelectOrganisation?: (org: Organisation) => void
 }
 
-export function OrganisationsList({ onCreateNew, refreshTrigger }: OrganisationsListProps) {
+export function OrganisationsList({ onCreateNew, refreshTrigger, onSelectOrganisation }: OrganisationsListProps) {
   const { 
     allOrganisations: organisations, 
     isLoadingAll: loading, 
@@ -83,18 +84,11 @@ export function OrganisationsList({ onCreateNew, refreshTrigger }: Organisations
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Organisations</h2>
-          <p className="text-sm text-gray-600">
-            Manage all organisations in the system ({organisations.length} total)
-          </p>
-        </div>
-        {onCreateNew && (
-          <Button onClick={onCreateNew} variant="primary">
-            Create New Organisation
-          </Button>
-        )}
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900">Organisations</h2>
+        <p className="text-sm text-gray-600">
+          Manage all organisations in the system ({organisations.length} total)
+        </p>
       </div>
 
       {organisations.length === 0 ? (
@@ -119,9 +113,6 @@ export function OrganisationsList({ onCreateNew, refreshTrigger }: Organisations
                     Industry
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    SIC Code
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Plan
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -134,7 +125,11 @@ export function OrganisationsList({ onCreateNew, refreshTrigger }: Organisations
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {organisations.map((org) => (
-                  <tr key={org.id} className="hover:bg-gray-50">
+                  <tr 
+                    key={org.id} 
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => onSelectOrganisation?.(org)}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
@@ -153,22 +148,6 @@ export function OrganisationsList({ onCreateNew, refreshTrigger }: Organisations
                       >
                         {org.industry_type.replace('_', ' ').toUpperCase()}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {org.sic_code ? (
-                          <span className="font-mono bg-gray-100 px-2 py-1 rounded">
-                            {org.sic_code}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </div>
-                      {org.sic_code === '59140' && (
-                        <div className="text-xs text-green-600 mt-1">
-                          Cinema Exhibition
-                        </div>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span

@@ -21,9 +21,10 @@ export interface OrganisationCreate {
   industry_type: string
   subscription_plan: 'basic' | 'professional' | 'enterprise'
   sic_code?: string
-  admin_email: string
-  admin_first_name: string
-  admin_last_name: string
+  admin_email?: string
+  admin_first_name?: string
+  admin_last_name?: string
+  applications?: string[]
 }
 
 export interface IndustryOption {
