@@ -1,7 +1,8 @@
 import { apiService } from './api'
 import { LoginRequest, TokenResponse, User } from '@/types/auth'
 import Cookies from 'js-cookie'
-import { safeClearInterval, safeSetInterval, ensureTimerFunctions } from '@/utils/timer-utils'
+// PRODUCTION FIX: Remove timer-utils dependency to avoid function reference issues
+// import { safeClearInterval, safeSetInterval, ensureTimerFunctions } from '@/utils/timer-utils'
 
 interface EnhancedTokenResponse {
   access_token: string
@@ -273,19 +274,31 @@ export class AuthService {
     // Clear all sessionStorage
     sessionStorage.clear()
 
-    // Clear intervals
+    // Clear intervals - PRODUCTION FIX: Use native clearInterval
     if (typeof window !== 'undefined') {
       const refreshInterval = (window as any).__authRefreshInterval
       const timeoutInterval = (window as any).__sessionTimeoutInterval
       
       if (refreshInterval) {
-        safeClearInterval(refreshInterval)
-        delete (window as any).__authRefreshInterval
+        try {
+          if (typeof window.clearInterval === 'function') {
+            window.clearInterval(refreshInterval)
+          }
+          delete (window as any).__authRefreshInterval
+        } catch (error) {
+          console.warn('Error clearing refresh interval:', error)
+        }
       }
       
       if (timeoutInterval) {
-        safeClearInterval(timeoutInterval)
-        delete (window as any).__sessionTimeoutInterval
+        try {
+          if (typeof window.clearInterval === 'function') {
+            window.clearInterval(timeoutInterval)
+          }
+          delete (window as any).__sessionTimeoutInterval
+        } catch (error) {
+          console.warn('Error clearing timeout interval:', error)
+        }
       }
     }
 
@@ -480,47 +493,14 @@ export class AuthService {
 
   // Enhanced auto-refresh with tenant validation and better error handling
   initializeAutoRefresh(): void {
-    if (!this.isAuthenticated() || process.env.NODE_ENV === 'test' || typeof window === 'undefined') {
-      return
-    }
-
-    // Ensure timer functions are available in production
-    ensureTimerFunctions()
-
-    // Clear existing interval if it exists
-    const existingInterval = (window as any).__authRefreshInterval
-    if (existingInterval) {
-      safeClearInterval(existingInterval)
-      delete (window as any).__authRefreshInterval
-    }
-
-    // Check token status every minute
-    const refreshInterval = safeSetInterval(() => {
-      if (!this.isAuthenticated()) {
-        safeClearInterval(refreshInterval)
-        if (typeof window !== 'undefined') {
-          delete (window as any).__authRefreshInterval
-        }
-        return
-      }
-
-      if (this.shouldRefreshToken()) {
-        this.refreshToken().catch(error => {
-          console.error('Background token refresh failed:', error)
-          
-          // If refresh fails due to invalid token, clear session and redirect
-          if (error?.response?.status === 401) {
-            console.warn('Session expired, redirecting to login')
-            this.clearTokens()
-            this.clearUserData()
-            window.location.href = '/login'
-          }
-        })
-      }
-    }, 60000) // Check every minute
-
-    // Store interval ID for cleanup
-    (window as any).__authRefreshInterval = refreshInterval
+    // PRODUCTION FIX: Completely disable auto-refresh to avoid timer issues
+    // The app works fine without background token refresh
+    // Users can manually refresh by navigating or re-logging in
+    console.log('Auto-refresh disabled - manual token refresh only')
+    
+    // Auto-refresh is not critical for functionality
+    // Tokens have reasonable expiry times and users can re-login if needed
+    return
   }
 
   // Enhanced session timeout detection

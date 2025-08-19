@@ -32,6 +32,16 @@ class ApiService {
     this.client.interceptors.request.use(
       (config) => {
         const token = Cookies.get('access_token')
+        
+        // PRODUCTION DEBUG: Log token status for troubleshooting
+        if (process.env.NODE_ENV === 'production') {
+          console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)
+          console.log(`Token available: ${token ? 'YES' : 'NO'}`)
+          if (!token) {
+            console.log('❌ No access token - request will fail with 403/401')
+          }
+        }
+        
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
@@ -49,6 +59,12 @@ class ApiService {
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
+        // PRODUCTION DEBUG: Log response errors for troubleshooting
+        if (process.env.NODE_ENV === 'production') {
+          console.log(`API Error: ${error.response?.status} ${error.response?.statusText}`)
+          console.log(`URL: ${error.config?.url}`)
+          console.log(`Response: ${error.response?.data ? JSON.stringify(error.response.data).substring(0, 200) : 'No response data'}`)
+        }
         const originalRequest = error.config
 
         // Handle specific error cases that should not trigger retries

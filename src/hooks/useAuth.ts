@@ -3,7 +3,8 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { User } from '@/types/auth'
 import { authService } from '@/services/auth'
-import { safeClearInterval, ensureTimerFunctions } from '@/utils/timer-utils'
+// PRODUCTION FIX: Remove timer-utils dependency to avoid function reference issues
+// import { safeClearInterval, ensureTimerFunctions } from '@/utils/timer-utils'
 
 interface EnhancedUser extends User {
   created_at?: string
@@ -66,8 +67,8 @@ export const useAuth = (): AuthContextType => {
   // Initialize timer-based features only on client-side after mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Ensure timer functions are available before initialization
-      ensureTimerFunctions()
+      // PRODUCTION FIX: Simplified timer initialization
+      console.log('Initializing auth services with native timer support')
       
       // Initialize auto-refresh and activity tracking
       authService.initializeAutoRefresh()
@@ -79,13 +80,25 @@ export const useAuth = (): AuthContextType => {
         const timeoutInterval = (window as any).__sessionTimeoutInterval
         
         if (refreshInterval) {
-          safeClearInterval(refreshInterval)
-          delete (window as any).__authRefreshInterval
+          try {
+            if (typeof window.clearInterval === 'function') {
+              window.clearInterval(refreshInterval)
+            }
+            delete (window as any).__authRefreshInterval
+          } catch (error) {
+            console.warn('Error clearing refresh interval in cleanup:', error)
+          }
         }
         
         if (timeoutInterval) {
-          safeClearInterval(timeoutInterval)
-          delete (window as any).__sessionTimeoutInterval
+          try {
+            if (typeof window.clearInterval === 'function') {
+              window.clearInterval(timeoutInterval)
+            }
+            delete (window as any).__sessionTimeoutInterval
+          } catch (error) {
+            console.warn('Error clearing timeout interval in cleanup:', error)
+          }
         }
       }
     }

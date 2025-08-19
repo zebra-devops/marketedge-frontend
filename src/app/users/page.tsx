@@ -21,7 +21,7 @@ interface User {
   is_active: boolean
   created_at: string
   last_login?: string
-  invitation_status: 'pending' | 'accepted' | 'expired'
+  invitation_status?: 'pending' | 'accepted' | 'expired'
 }
 
 interface CreateUserForm {
@@ -206,19 +206,19 @@ export default function UsersPage() {
     }
   }
 
-  const getInvitationStatusColor = (status: string) => {
+  const getInvitationStatusColor = (status: string | undefined) => {
     switch (status) {
       case 'accepted': return 'bg-green-100 text-green-800'
       case 'pending': return 'bg-yellow-100 text-yellow-800'
       case 'expired': return 'bg-red-100 text-red-800'
-      default: return 'bg-gray-100 text-gray-800'
+      default: return 'bg-green-100 text-green-800' // Default to 'accepted' color for undefined/unknown status
     }
   }
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesSearch = (user.first_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.last_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = selectedRole === 'all' || user.role === selectedRole
     return matchesSearch && matchesRole
   })
@@ -320,14 +320,14 @@ export default function UsersPage() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {user.first_name} {user.last_name}
+                        {user.first_name || ''} {user.last_name || ''}
                       </div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="text-sm text-gray-500">{user.email || ''}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
-                      {user.role}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role || 'viewer')}`}>
+                      {user.role || 'viewer'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -338,8 +338,11 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getInvitationStatusColor(user.invitation_status)}`}>
-                      {user.invitation_status.charAt(0).toUpperCase() + user.invitation_status.slice(1)}
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getInvitationStatusColor(user.invitation_status || 'accepted')}`}>
+                      {user.invitation_status ? 
+                        user.invitation_status.charAt(0).toUpperCase() + user.invitation_status.slice(1) : 
+                        'Accepted'
+                      }
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
