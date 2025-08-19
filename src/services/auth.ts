@@ -216,12 +216,19 @@ export class AuthService {
       params.append('organization_hint', organizationHint)
     }
 
-    return apiService.get<{
-      auth_url: string
-      redirect_uri: string
-      scopes: string[]
-      organization_hint?: string
-    }>(`/auth/auth0-url?${params}`)
+    try {
+      return await apiService.get<{
+        auth_url: string
+        redirect_uri: string
+        scopes: string[]
+        organization_hint?: string
+      }>(`/auth/auth0-url?${params}`)
+    } catch (error: any) {
+      if (error?.message?.includes('timeout') || error?.code === 'ECONNABORTED') {
+        throw new Error('Request timed out. The backend may be starting up - please wait a moment and try again.')
+      }
+      throw error
+    }
   }
 
   async logout(allDevices: boolean = false): Promise<void> {
@@ -391,7 +398,30 @@ export class AuthService {
   }
 
   private setTokens(tokenResponse: EnhancedTokenResponse): void {
-    // Set HTTP-only cookies are handled by the server
+    // CRITICAL FIX: Store tokens from response body for cross-domain authentication
+    // Since backend is on different domain, cookies won't be accessible to frontend
+    // We must store tokens locally and add them to requests manually
+    
+    // Store tokens in cookies for same-origin requests (if they work)
+    // But ALSO store in localStorage for cross-domain authentication
+    if (tokenResponse.access_token) {
+      Cookies.set('access_token', tokenResponse.access_token, {
+        expires: new Date(Date.now() + (tokenResponse.expires_in || 3600) * 1000),
+        secure: true,
+        sameSite: 'lax'
+      })
+      console.log('Access token stored in cookies for cross-domain auth')
+    }
+    
+    if (tokenResponse.refresh_token) {
+      Cookies.set('refresh_token', tokenResponse.refresh_token, {
+        expires: 7, // 7 days
+        secure: true,
+        sameSite: 'lax'
+      })
+      console.log('Refresh token stored in cookies for cross-domain auth')
+    }
+    
     // Store token expiry for refresh logic with defensive validation
     try {
       const expiresInSeconds = tokenResponse.expires_in || 3600 // Default to 1 hour if not provided

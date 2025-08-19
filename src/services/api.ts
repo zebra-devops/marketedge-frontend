@@ -10,7 +10,8 @@ class ApiService {
   constructor() {
     this.client = axios.create({
       baseURL: process.env.NEXT_PUBLIC_API_BASE_URL + '/api/v1',
-      timeout: 30000, // 30 second timeout
+      timeout: 60000, // 60 second timeout to handle Render cold starts
+      withCredentials: true, // Include cookies for cross-origin requests
       headers: {
         'Content-Type': 'application/json',
       },
@@ -88,7 +89,7 @@ class ApiService {
         // Handle network errors with better messaging
         if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
           console.error('Request timeout:', error)
-          return Promise.reject(new Error('Request timed out. Please try again.'))
+          return Promise.reject(new Error('Request timeout: Backend may be starting up (cold start). Please wait a moment and try again.'))
         }
 
         if (error.code === 'ERR_NETWORK') {
@@ -129,7 +130,10 @@ class ApiService {
   async refreshToken(data: RefreshTokenRequest): Promise<{ access_token: string; token_type: string }> {
     const response = await axios.post(
       `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/refresh`,
-      data
+      data,
+      {
+        withCredentials: true // Include cookies for refresh token request
+      }
     )
     return response.data
   }
